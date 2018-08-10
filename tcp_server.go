@@ -10,6 +10,8 @@ import (
 	"hash/fnv"
 	"strconv"
 	"strings"
+	"net"
+	"net/rpc"
     )
 
 func uuID() string {
@@ -49,7 +51,7 @@ func dbConn() (db *sql.DB) {
     return db
 }
 
-func insertUser( realname string, nickname string, pwd string, avatar string) bool {
+func insertUser( realname string, nickname string, pwd string, avatar string) string {
 	uuid := uuID()
 	//db, err := sql.Open("mysql", "root:HappyAlejandroSeaah999@tcp(198.13.43.63:3306)/UserDB?tls=skip-verify&autocommit=true")
 	db :=dbConn()
@@ -61,7 +63,7 @@ func insertUser( realname string, nickname string, pwd string, avatar string) bo
         row := db.QueryRow(sqlStatement, realname)
         err := row.Scan(&idNum)
         if idNum > 0 {
-                return false; //should NOT overwrite existing data
+                return "{code:1,msg:'should NOT overwrite existing data'}" 
         }
 
 	stmt, err := db.Prepare("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?")
@@ -71,7 +73,7 @@ func insertUser( realname string, nickname string, pwd string, avatar string) bo
 	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
 	_ = es
 	fmt.Println(err)
-	return true;
+	return "{code:0,msg:''}";
 }
 
 func login(realname string, pwd string) string {
@@ -163,6 +165,42 @@ func updateAvatar( uuid string, pid string) string {
 	//checkErr(err)
 }
 
+//===================
+type Args2 struct {
+	A,B string
+}
+
+type Args3 struct {
+	A,B,C string
+}
+
+
+type Args4 struct {
+	A,B,C,D string
+}
+
+
+type Query string
+
+func (t *Query) SignUp( args *Args4, reply *string) error{
+	*reply = insertUser(args.A, args.B, args.C, args.D)
+	return nil
+}
+
+func (t *Query) SignIn( args *Args2, reply *string) error{
+	*reply = login(args.A, args.B)
+	return nil
+}
+
+func (t *Query) InitAvatar( args *Args2, reply *string) error{
+	*reply = insertAvatar(args.A, args.B)
+	return nil
+}
+
+func (t *Query) ChangeAvatar( args *Args2, reply *string) error{
+	*reply = updateAvatar(args.A, args.B)
+	return nil
+}
 
 func main() {
 	/*fmt.Println(insertUser("kljrealabcd","nick","pwd","avatar"))
@@ -171,5 +209,20 @@ func main() {
 	fmt.Println(insertAvatar( "abcd", "pid string"))
 	fmt.Println(updateAvatar( "abcd", "pitring"))
 	*/
-		
+    teller := new(Query)
+    rpc.Register(teller)
+
+    tcpAddr, err := net.ResolveTCPAddr("tcp", ":54321")
+    checkErr(err)
+
+    listener, err := net.ListenTCP("tcp", tcpAddr)
+    checkErr(err)
+
+    for {
+        conn, err := listener.Accept()
+        if err != nil {
+            continue
+        }
+        rpc.ServeConn(conn)
+    }		
 }
