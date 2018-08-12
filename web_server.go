@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"crypto/md5"
 	"encoding/json"
+	"github.com/gorilla/sessions"
 )
 
 type Args struct {
@@ -47,6 +48,15 @@ type Resp struct {
 	msg	string
 	data [] string
 }
+
+
+var (
+	// key must be 16, 24 or 32 bytes long (AES-128, AES-192 or AES-256)
+	key = []byte("super-secret-key")
+	store = sessions.NewCookieStore(key)
+)
+
+
 
 func sayhelloName(w http.ResponseWriter, r *http.Request) {
     r.ParseForm() //Parse url parameters passed, then parse the response packet for the POST body (request body)
@@ -113,21 +123,40 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		//communicate with tcp server and proxy server  
 		client, err := rpc.Dial("tcp", "localhost:9999")
 		if err != nil {
+			fmt.Println(err)
 			log.Fatal("dialing:", err)
 		}
 		args := Args4{realname,nickname,pwd1,""}
-		var uuid string
-		err = client.Call("Query.SignUp", args, &uuid)
-
+		var reply string
+		err = client.Call("Query.SignUp", args, &reply)
 		if err != nil {
-			log.Fatal("error:", err)
+			fmt.Println(err)
+			log.Fatal("Query.SignUp error:", err)
+		}
+		fmt.Println("check : %v",reply)	
+	byt := []byte(reply)
+	var dat map[string]interface{}
+	if err := json.Unmarshal(byt, &dat); err != nil {
+		fmt.Println("careful :" + reply)
+		panic(err)
+	}
+		code := dat["code"].(float64)
+		uuid := dat["uuid"].(string)
+		msg := dat["msg"].(string)
+		if code != 0 {
+			fmt.Println("Sign up failed, msg : %v",msg)
+			http.Redirect(w, r, "/signup", 302)	
 		}
 		fmt.Printf("uuid:%s\n",  uuid)
 
-		// store session info 
-
+		// store session info
+		fmt.Println("sess start")
+		session, _ := store.Get(r, "cookie-name")
+		session.Values["authenticated"] = true
+		session.Values["uuid"] = uuid
+		session.Save(r, w)
+		fmt.Println("sess saved")
 		http.Redirect(w, r, "/upload", 302)	
-
 	}
 }
 
@@ -171,33 +200,54 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
         //request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", "./shell.png")
         request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
         if err != nil {
-                log.Fatal(err)
-		return "NULL"
+            log.Fatal(err)
+			return "NULL"
         }
         client := &http.Client{}
         resp, err := client.Do(request)
         if err != nil {
-                log.Fatal(err)
-		return "NULL"
+            log.Fatal(err)
+			return "NULL"
         } else {
-                body := &bytes.Buffer{}
-                _, err := body.ReadFrom(resp.Body)
-                if err != nil {
-                        log.Fatal(err)
-                }
-                resp.Body.Close()
-                fmt.Println(resp.StatusCode)
-                fmt.Println(resp.Header)
+			body := &bytes.Buffer{}
+			_, err := body.ReadFrom(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			resp.Body.Close()
+			fmt.Println(resp.StatusCode)
+			fmt.Println(resp.Header)
 
-                //fmt.Println(body)
-                strs := strings.Split(body.String() ,"http://yourhostname:4869/")
-                strs1 := strings.Split(strs[1],"</a>")
-                fmt.Println(strs1[0])
-		return strs1[0]  //photoID
-        }
+			//fmt.Println(body)
+			strs := strings.Split(body.String() ,"http://yourhostname:4869/")
+			strs1 := strings.Split(strs[1],"</a>")
+			fmt.Println(strs1[0])
+			//defer client.Close()
+			return strs1[0]  //photoID
+    }
+}
+
+
+func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	session.Values["authenticated"] = false
+	session.Values["uuid"] = ""
+	session.Save(r,w)
+
+	http.Redirect(w,r,"/login",302)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	//check auth
+	if auth, ok := session.Values["authenticated"].(bool); !auth {
+		_ = ok
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		http.Redirect(w, r, "/signup", 302)
+	}
+
+	uuid := session.Values["uuid"].(string)	
+
 	fmt.Println("method:", r.Method)
 	if r.Method == "GET" {
 		crutime := time.Now().Unix()
@@ -223,33 +273,123 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "%v", uploadedFileName )
 		fmt.Fprintf(w, "%v", handler.Header)
 
-		f, err := os.OpenFile("./test/" + handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+		f, err := os.OpenFile("./tmp/" + handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 		defer f.Close()
 		io.Copy(f, file)
-		localFile := "./test/" + uploadedFileName
+		localFile := "./tmp/" + uploadedFileName
 		photoID := upload_help(localFile)
+		fmt.Printf("see photo ID : %s", photoID)
 		fmt.Fprintf(w, "photo ID : %v", photoID)
 
 		// delete file
 		if photoID != "NULL" {
-			os.Remove(localFile)
+			fmt.Println("good ,go on")
 			//var err = os.Remove(localFile)
 			//if isError(err) { return }
-			http.Redirect(w, r, "/display", 302)
-		}else{//should try again
+			session.Values["photoid"] = photoID
+			session.Save(r, w)
+			fmt.Println("saved")
+			//update db
+			
+			var reply string
+			client, err := rpc.Dial("tcp", "127.0.0.1:9999")
+			fmt.Println(err)
+			args := Args2{ uuid, photoID}
+			err = client.Call("Query.InitAvatar", args, &reply)
+			if err != nil {
+				fmt.Println(err)
+			}
+			
+
+			fmt.Println("reply: " + reply)
+			byt := []byte(reply)
+			var dat map[string]interface{}
+			if err := json.Unmarshal(byt, &dat); err != nil {
+				panic(err)
+			}
+			_ = err 
+			code := dat["code"].(float64)
+			//uuid := dat["uuid"].(string)
+			fmt.Println(code)
+			if code != 0 {
+				fmt.Println("failed to upload db")
+				http.Redirect(w, r, "/upload", 302)
+				//http.Redirect(w,r,"/login", 302)
+			}
+			//update redis
+		
+			//os.Remove(localFile)
+			http.Redirect(w, r, "/home", 302)
+		}else{//
+			fmt.Println("wrong")
+			http.Redirect(w, r, "/upload", 302)
 		}
 	}
 }
 
 
-//==============================
+
+type HomeInfo struct{
+	AvatarUrl string
+	Nickname string
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	// Check if user is authenticated
+	if auth, ok := session.Values["authenticated"].(bool); !auth {
+		_ = ok
+		fmt.Println("Log in first")
+		http.Redirect(w, r, "/login", 302) // redirect to home page
+		//http.Error(w, "Forbidden", http.StatusForbidden)
+		//return
+	}
+
+	//pid := session.Values["photoid"].(string)
+	uuid := session.Values["uuid"].(string)
+	var reply string
+
+	client, err := rpc.Dial("tcp", "localhost:9999")
+	args := Args2{uuid,""}
+	err = client.Call("Query.InitAvatar", args, &reply)
+	byt := []byte(reply)
+	var dat map[string]interface{}
+	json.Unmarshal(byt, &dat)
+	code := dat["code"].(float64)
+	pid := dat["photoid"].(string)
+	nickname := dat["nickname"].(string)
+	avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
+	_ = err	
+	_ = code
+	data := HomeInfo{
+		AvatarUrl : avatar_url,
+		Nickname : nickname,
+	}
+
+	t, _ := template.ParseFiles("tpl/home.gtpl")
+	t.Execute(w, data)
+	
+
+}
 
 
-func login(w http.ResponseWriter, r *http.Request) {
+
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	// Check if user is authenticated
+	if auth, ok := session.Values["authenticated"].(bool); auth {
+		fmt.Println("Already logged in ")
+		_ = ok
+		http.Redirect(w, r, "/home", 302) // redirect to home page
+		//http.Error(w, "Forbidden", http.StatusForbidden)
+		//return
+	}
+
 	fmt.Println("method:", r.Method) //get request method
 	if r.Method == "GET" {
 	t, _ := template.ParseFiles("tpl/login.gtpl")
@@ -264,37 +404,43 @@ func login(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("password:", pwd)
 
 
-		client, err := rpc.Dial("tcp", "localhost:9999")
-		if err != nil {
-			log.Fatal("dialing:", err)
-		}
-		args := Args2{username,pwd}
-		var reply string
-		err = client.Call("Query.SignIn", args, &reply)
+	client, err := rpc.Dial("tcp", "localhost:9999")
+	if err != nil {
+		log.Fatal("dialing:", err)
+	}
+	args := Args2{username,pwd}
+	var reply string
+	err = client.Call("Query.SignIn", args, &reply)
 
-		if err != nil {
-			log.Fatal("error:", err)
-		}
-		fmt.Printf("response:%s\n",  reply)
+	if err != nil {
+		log.Fatal("error:", err)
+	}
+	fmt.Printf("response:%s\n",  reply)
 /*	
-		byt, err := json.Marshal(reply)
-		if err != nil {
-			panic(err)
-		}
+	byt, err := json.Marshal(reply)
+	if err != nil {
+		panic(err)
+	}
 */
-		byt := []byte(reply)
-		var dat map[string]interface{}
-		if err := json.Unmarshal(byt, &dat); err != nil {
-			panic(err)
-		}
-		code := dat["code"].(float64)
-		uuid := dat["uuid"].(string)
-		fmt.Println(code)
-		fmt.Println("uuid: %s",uuid)
-		//fmt.Println(dat)
-		fmt.Println("well done")
-        //communicate with tcp server and proxy server
-
+	byt := []byte(reply)
+	var dat map[string]interface{}
+	if err := json.Unmarshal(byt, &dat); err != nil {
+		panic(err)
+	}
+	code := dat["code"].(float64)
+	uuid := dat["uuid"].(string)
+	fmt.Println(code)
+	if code != 0 {
+		fmt.Println("failed to login")
+		http.Redirect(w,r,"/login", 302)
+	}
+	fmt.Println("uuid: %s",uuid)
+	//fmt.Println(dat)	
+	//communicate with tcp server and proxy server
+	session.Values["authenticated"] = true
+	session.Values["uuid"] = uuid
+	session.Save(r, w)
+	http.Redirect(w, r, "/home", 302)
   }
 }
 
@@ -309,13 +455,14 @@ func main() {
 	//http.HandleFunc("/", sayhelloName) // setting router rule
 	http.HandleFunc("/signup", signup)
 	http.HandleFunc("/upload", uploadHandler)
-	http.HandleFunc("/login", login)
+	http.HandleFunc("/login", loginHandler)
+	http.HandleFunc("/logout", logoutHandler)
+	http.HandleFunc("/home", homeHandler)
 
-/*
-	http.HandleFunc("/login", )
-	http.HandleFunc("/display", uploadHandler)
-	http.HandleFunc("/edit", uploadHandler)
-*/
+	/*
+	http.HandleFunc("/edit", editHandler)
+	*/
+
 	err := http.ListenAndServe(":9090", nil) // setting listening port
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)

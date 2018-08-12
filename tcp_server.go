@@ -73,7 +73,9 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
 	_ = es
 	fmt.Println(err)
-	return "{\"code\":0,\"msg\":\"\"}";
+
+	return login(realname ,pwd)
+	//return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid +"\"}";
 }
 
 func login(realname string, pwd string) string {
@@ -96,6 +98,43 @@ func login(realname string, pwd string) string {
 	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid + "\"}"
 }
 
+
+func lookup(uuid string) string {
+	db := dbConn()
+
+	var nname string
+	var photoID string
+	
+	
+	sqlStatement := `SELECT nickname FROM user WHERE uuid=?`
+	row := db.QueryRow(sqlStatement, uuid)
+	err := row.Scan(&nname)
+	if err != nil {
+	    if err == sql.ErrNoRows {
+		//fmt.Println("Zero rows found")
+			return "{\"code\":1,\"msg\":\"failed\",\"data\":\"\"}"
+	    } else {
+			panic(err)
+	    }
+	}
+	
+	sqlStatement = `SELECT pid FROM avatar WHERE uuid=?`
+	row = db.QueryRow(sqlStatement, uuid)
+	err = row.Scan(&photoID)
+	if err != nil {
+	    if err == sql.ErrNoRows {
+		//fmt.Println("Zero rows found")
+			return "{\"code\":2,\"msg\":\"photo id failed\",\"data\":\"\"}"
+	    } else {
+			panic(err)
+	    }
+	}
+
+	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
+	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + photoID + "\",\"nickname\":\"" + nname + "\"}"
+}
+
+
 func updateNickname( uuid string, nickname string) string {
 	db := dbConn()
 	
@@ -104,11 +143,11 @@ func updateNickname( uuid string, nickname string) string {
         row := db.QueryRow(sqlStatement, uuid)
         err := row.Scan(&idNum)
 	if idNum < 1 {
-		return "{\"code\":1,\"msg\":\"user NOT exists\"}";
+		return "{\"code\":1,\"msg\":\"user NOT exists\",\"uuid\":\"\"}";
 	}
         if err != nil {
             if err == sql.ErrNoRows {
-                return "{\"code\":2,\"msg\":\"No row found\"}";
+				return "{\"code\":2,\"msg\":\"No row found\",\"uuid\":\"\"}";
             } else {
                 panic(err)
             }
@@ -128,15 +167,15 @@ func updateNickname( uuid string, nickname string) string {
 func insertAvatar( uuid string, pid string) string {
 	db := dbConn()
 	//check uuid
-	var idNum int
+/*	var idNum int
         sqlStatement := `SELECT count(*) FROM avatar  WHERE uuid=?`
         row := db.QueryRow(sqlStatement, uuid)
         err := row.Scan(&idNum)
 	if idNum > 0 {
 		return "{\"code\":1,\"msg\":\"already exists\"}"; //should NOT overwrite existing data
 	}
-
-	stmt, err := db.Prepare("insert into avatar set  uuid=?,pid=?")
+*/
+	stmt, err := db.Prepare("insert  avatar set  uuid=?,pid=?")
 	checkErr(err)
 	res, err := stmt.Exec(uuid,pid)
 	checkErr(err)
@@ -190,6 +229,13 @@ func (t *Query) SignUp( args *Args4, reply *string) error{
 
 func (t *Query) SignIn( args *Args2, reply *string) error{
 	*reply = login(args.A, args.B)
+	return nil
+}
+
+
+
+func (t *Query) Lookup( args *Args2, reply *string) error{
+	*reply = lookup(args.A)
 	return nil
 }
 
