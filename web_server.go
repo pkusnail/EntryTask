@@ -377,7 +377,27 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
+//todo
 
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	session, _ := store.Get(r, "cookie-name")
+	// Check if user is authenticated
+	if auth, ok := session.Values["authenticated"].(bool); auth {
+		fmt.Println("Already logged in ")
+		_ = ok
+		http.Redirect(w, r, "/home", 302) // redirect to home page
+		//http.Error(w, "Forbidden", http.StatusForbidden)
+		//return
+	}
+
+	fmt.Println("method:", r.Method) //get request method
+	if r.Method == "GET" {
+	t, _ := template.ParseFiles("tpl/edit.gtpl")
+	t.Execute(w, nil)
+	} else {
+
+	}
+}
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "cookie-name")
@@ -450,18 +470,13 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func main() {
-	//fs := http.FileServer(http.Dir("tpl/"))
-	//http.Handle("/static/", http.StripPrefix("/static/", fs))
-	//http.HandleFunc("/", sayhelloName) // setting router rule
 	http.HandleFunc("/signup", signup)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/login", loginHandler)
 	http.HandleFunc("/logout", logoutHandler)
 	http.HandleFunc("/home", homeHandler)
-
-	/*
 	http.HandleFunc("/edit", editHandler)
-	*/
+
 
 	err := http.ListenAndServe(":9090", nil) // setting listening port
 	if err != nil {
