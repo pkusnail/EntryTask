@@ -53,6 +53,16 @@ Client: Chrome and Firefox
 
 # Design of the System
 
+## System Archecture
+
+#### Final Overlook (just show the idea)
+After improvements , the system should look like:
+![image](http://alejandroseaah.com:4869/4fe9982280f58404f88f4ab8fec783a1?h=600&w=500)
+
+#### Real Picture
+But now , it is:
+![image](http://alejandroseaah.com:4869/ff75e5165d164bac7f55cb75b2aeebf9?w=400&h=500)
+
 ## Database Design
 All tables are in a database named UserDB, there are three tables:
 1. user table : storing uuid (universally unique identifier, as unique user id), real name , nick name and password
