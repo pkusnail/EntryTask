@@ -57,14 +57,14 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 	db :=dbConn()
 	//checkErr(err)
 	// check if realname already exists ,if so , insert fail
-        
+		
 	var idNum int
-        sqlStatement := `SELECT count(*) FROM user  WHERE realname=?`
-        row := db.QueryRow(sqlStatement, realname)
-        err := row.Scan(&idNum)
-        if idNum > 0 {
-                return "{code:1,msg:'should NOT overwrite existing data'}" 
-        }
+	sqlStatement := `SELECT count(*) FROM user  WHERE realname=?`
+	row := db.QueryRow(sqlStatement, realname)
+	err := row.Scan(&idNum)
+	if idNum > 0 {
+			return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\"}" 
+	}
 
 	stmt, err := db.Prepare("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?")
 	checkErr(err)
@@ -73,7 +73,7 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
 	_ = es
 	fmt.Println(err)
-	return "{code:0,msg:''}";
+	return "{\"code\":0,\"msg\":\"\"}";
 }
 
 func login(realname string, pwd string) string {
@@ -87,12 +87,13 @@ func login(realname string, pwd string) string {
 	if err != nil {
 	    if err == sql.ErrNoRows {
 		//fmt.Println("Zero rows found")
-		return ""
+			return "{\"code\":1,\"msg\":\"failed\",\"data\":\"\"}"
 	    } else {
-		panic(err)
+			panic(err)
 	    }
 	}
-	return uuid
+	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
+	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid + "\"}"
 }
 
 func updateNickname( uuid string, nickname string) string {
@@ -103,11 +104,11 @@ func updateNickname( uuid string, nickname string) string {
         row := db.QueryRow(sqlStatement, uuid)
         err := row.Scan(&idNum)
 	if idNum < 1 {
-		return "{code:1, msg:' user NOT exists'}";
+		return "{\"code\":1,\"msg\":\"user NOT exists\"}";
 	}
         if err != nil {
             if err == sql.ErrNoRows {
-                return "{code:2, msg:'No row found'}";
+                return "{\"code\":2,\"msg\":\"No row found\"}";
             } else {
                 panic(err)
             }
@@ -120,7 +121,7 @@ func updateNickname( uuid string, nickname string) string {
 	affect, err := res.RowsAffected()
 	_ = affect
 	checkErr(err)
-	return "{code:0, msg:''}";
+	return "{\"code\":0,\"msg\":\"\"}";
 }
 
 
@@ -132,7 +133,7 @@ func insertAvatar( uuid string, pid string) string {
         row := db.QueryRow(sqlStatement, uuid)
         err := row.Scan(&idNum)
 	if idNum > 0 {
-		return "{code:1, msg:'already exists'}"; //should NOT overwrite existing data
+		return "{\"code\":1,\"msg\":\"already exists\"}"; //should NOT overwrite existing data
 	}
 
 	stmt, err := db.Prepare("insert into avatar set  uuid=?,pid=?")
@@ -141,9 +142,9 @@ func insertAvatar( uuid string, pid string) string {
 	checkErr(err)
 	affect, err := res.RowsAffected()
 	if affect > 0 {
-		return "{code:0, msg:'success'}";
+		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
 	} else {
-		return "{code:2, msg:'failed to insert avatar'}";
+		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
 	}
 	//checkErr(err)
 }
@@ -158,9 +159,9 @@ func updateAvatar( uuid string, pid string) string {
 	affect, err := res.RowsAffected()
 	_ = affect
 	if affect > 0 {
-		return "{code:0, msg:'success'}";
+		return "{\"code\":0,\"msg\":\"success\"}";
 	} else {
-		return "{code:1, msg:'failed to update avatar'}";
+		return "{\"code\":1,\"msg\":\"failed to update avatar\"}";
 	}
 	//checkErr(err)
 }
@@ -212,7 +213,7 @@ func main() {
     teller := new(Query)
     rpc.Register(teller)
 
-    tcpAddr, err := net.ResolveTCPAddr("tcp", ":54321")
+    tcpAddr, err := net.ResolveTCPAddr("tcp", ":9999")
     checkErr(err)
 
     listener, err := net.ListenTCP("tcp", tcpAddr)
@@ -224,5 +225,5 @@ func main() {
             continue
         }
         rpc.ServeConn(conn)
-    }		
+    }	
 }
