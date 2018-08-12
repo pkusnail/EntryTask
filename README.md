@@ -70,21 +70,6 @@ With the simple connection between them, it is easy to split database when neces
 
 
 ## System APIs
-### Web Server
-
-##### user signup
-
-url : domain/signup
-
-parameters:
-
-| para  |type | required  | max len| desc | example|
-| ----- |:----:|:----:|:----:|:----:|:----:|
-| realname | string| yes |1024 |||
-| username | string| yes |1024 |||
-| pwd1 | string| yes |32 ||password|
-| pwd2 | string| yes |32 |confirmed password||
-
 
 
 ### TCP Server
@@ -102,10 +87,11 @@ parameters:
 | ----- |:----:|:----:|:----:|:----:|:----:|
 | realname | string| yes |1024 |||
 | username | string| yes |1024 |||
-| pwd1 | string| yes |32 ||password|
+| pwd1 | string| yes |32 |password||
 | pwd2 | string| yes |32 |confirmed password||
 
 response:
+
 | para  |type | required  | max len| desc | example|
 | ----- |:----:|:----:|:----:|:----:|:----:|
 | code | string| yes | 1 |0 for success，otherwise fail||
@@ -129,49 +115,31 @@ func insertAvatar( uuid string, pid string) string
 call function:
 func updateAvatar( uuid string, pid string) string
 
-### query proxy
-For read query, query proxy will query redis first ,if result is found in redis ,then return the result directly to the client ,otherwise, query mysql and refresh the redis if query successfully\
-For write query , query proxy will interact with mysql directly ,if write operation is successful, and redis will be update\
-Query server interact with tcp server based on tcp protocol , provide serices to the http server based on http protocol.
-
-#### http api
-
-1. /signup?rn=abc&nn=def&pwd=pwd&pic=pic
-2. /login?nn=def&pwd=pwd
-
-3. /edit
-4. 
-
-
-### http server
+### http web server
 
 1. /signup
 2. /login
 3. /edit
+4. /home
+5. /upload
+6. /logout
 
-
-
-
-
-## Basic System Design  
-
-
-## Data Partitioning and Replication
 ## Redis Cache
 ## LoadBalance
 We can add a Load balancing layer at some places in our system:
-  1. Between http server and tcp servers
+  1. Between http web server and tcp servers
   2. Between tcp Servers and database servers
-  3. Between http Servers and Cache servers
+  3. Between http Servers and redis  cache servers
+  4. Between http Servers 
   ...
 
   
 ## Telemetry
-How many times a used id has been used within 1 hour, what were user locations, etc.? How to store these statistics? Some statistics worth tracking: country of the visitor, date and time of access, web page that refers the click, browser or platform from where the page was accessed.
+How many times a real name  has been used within an hour, what were the users? Any abnormal user behavior? Some statistics worth tracking: country of the visitor, date and time of access, web page that refers the click, browser or platform from where the page was accessed, how long they stayed, etc....
 
 
 ## Other considerations
-replace mysql with MariaDB, Cassandra or Green plum ?
+replace mysql with MariaDB, Cassandra , Green plum or other RMDB ?
 
 
 # repo
