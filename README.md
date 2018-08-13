@@ -1,8 +1,13 @@
-* update : this little project is deployed , just visit\
-http://alejandroseaah.com:9090/sginup\
-http://alejandroseaah.com:9090/login\
-http://alejandroseaah.com:9090/home\
-http://alejandroseaah.com:9090/edit\
+* update : this little project is deployed , just visit
+
+http://alejandroseaah.com:9090/sginup
+
+http://alejandroseaah.com:9090/login
+
+http://alejandroseaah.com:9090/home
+
+http://alejandroseaah.com:9090/edit
+
 http://alejandroseaah.com:9090/logout
 
 
