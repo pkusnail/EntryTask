@@ -1,3 +1,11 @@
+* update : this little project is deployed , just visit\
+http://alejandroseaah.com:9090/sginup\
+http://alejandroseaah.com:9090/login\
+http://alejandroseaah.com:9090/home\
+http://alejandroseaah.com:9090/edit\
+http://alejandroseaah.com:9090/logout
+
+
 # Requirements of the System
 
 ## Functional Requirements
@@ -11,7 +19,7 @@ User information includes: username (cannot be changed), nickname, profile pictu
 4. Separate HTTP server and TCP server and put the main logic on TCP server.Backend authentication logic should be done in the TCP server
 
 5. User information must be stored in a MySQL database. Connect by MySQL Go client.
-We can use redis as a user info cache ,for performance improvement purpouse
+We can use redis as a user info cache ,for performance improvement purpose
 
 ## Non-Functional Requirements & Considerations:
 
@@ -60,10 +68,13 @@ After improvements , the system should look like:
 
 ![image](http://alejandroseaah.com:4869/4fe9982280f58404f88f4ab8fec783a1?h=600&w=500)
 
-#### Real Picture
-But now , it is:
+#### Real Pict
+But now , it is
 
 ![image](http://alejandroseaah.com:4869/ff75e5165d164bac7f55cb75b2aeebf9?w=400&h=500)
+
+* For the convinence of horizontal extension, we deploy  [zimg](http://zimg.buaa.us/) server as our photo server, url : http://alejandroseaah.com:4869/
+
 
 ## Database Design
 All tables are in a database named UserDB, there are three tables:
@@ -166,5 +177,4 @@ https://github.com/pkusnail/EntryTask.git
 4. https://dev.maxmind.com/geoip/
 5. http://alejandroseaah.com:4869
 6. https://golang.org/doc/articles/wiki/
-7. 
-
+7. https://en.wikipedia.org/wiki/List_of_single_sign-on_implementations
