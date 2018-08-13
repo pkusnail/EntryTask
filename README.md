@@ -1,6 +1,6 @@
 * update : this little project is deployed , just visit
 
-http://alejandroseaah.com:9090/sginup
+http://alejandroseaah.com:9090/signup
 
 http://alejandroseaah.com:9090/login
 
