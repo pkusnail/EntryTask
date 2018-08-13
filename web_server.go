@@ -20,6 +20,12 @@ import (
 	"github.com/gorilla/sessions"
 )
 
+const (
+	CONN_HOST = "localhost"
+	CONN_PORT = "9999"
+	CONN_TYPE = "tcp"
+)
+
 type Args struct {
     A, B string
 }
@@ -49,6 +55,12 @@ type Resp struct {
 	data [] string
 }
 
+
+
+type HomeInfo struct {
+	AvatarUrl string
+	Nickname string
+}
 
 var (
 	// key must be 16, 24 or 32 bytes long (AES-128, AES-192 or AES-256)
@@ -121,7 +133,8 @@ func signup(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/signup", 301)
 		}
 		//communicate with tcp server and proxy server  
-		client, err := rpc.Dial("tcp", "localhost:9999")
+		//client, err := rpc.Dial("tcp", "localhost:9999")
+		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 		if err != nil {
 			fmt.Println(err)
 			log.Fatal("dialing:", err)
@@ -129,6 +142,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		args := Args4{realname,nickname,pwd1,""}
 		var reply string
 		err = client.Call("Query.SignUp", args, &reply)
+		client.Close()
 		if err != nil {
 			fmt.Println(err)
 			log.Fatal("Query.SignUp error:", err)
@@ -205,6 +219,7 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
         }
         client := &http.Client{}
         resp, err := client.Do(request)
+		//client.Close()
         if err != nil {
             log.Fatal(err)
 			return "NULL"
@@ -293,25 +308,27 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			session.Values["photoid"] = photoID
 			session.Save(r, w)
 			fmt.Println("saved")
-			//update db
-			
+			//update db	
 			var reply string
-			client, err := rpc.Dial("tcp", "127.0.0.1:9999")
-			fmt.Println(err)
-			args := Args2{ uuid, photoID}
-			err = client.Call("Query.InitAvatar", args, &reply)
+			//client, err := rpc.Dial("tcp", "127.0.0.1:9999")
+			client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 			if err != nil {
 				fmt.Println(err)
 			}
-			
 
+			args := Args2{ uuid, photoID}
+			err = client.Call("Query.InitAvatar", args, &reply)
+			client.Close()
+			if err != nil {
+				fmt.Println(err)
+			}
 			fmt.Println("reply: " + reply)
 			byt := []byte(reply)
 			var dat map[string]interface{}
 			if err := json.Unmarshal(byt, &dat); err != nil {
 				panic(err)
 			}
-			_ = err 
+			_ = err
 			code := dat["code"].(float64)
 			//uuid := dat["uuid"].(string)
 			fmt.Println(code)
@@ -321,8 +338,9 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				//http.Redirect(w,r,"/login", 302)
 			}
 			//update redis
-		
-			//os.Remove(localFile)
+
+			fmt.Println("good")
+			os.Remove(localFile)
 			http.Redirect(w, r, "/home", 302)
 		}else{//
 			fmt.Println("wrong")
@@ -332,11 +350,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 
-
-type HomeInfo struct{
-	AvatarUrl string
-	Nickname string
-}
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "cookie-name")
@@ -353,9 +366,12 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	uuid := session.Values["uuid"].(string)
 	var reply string
 
-	client, err := rpc.Dial("tcp", "localhost:9999")
+	//client, err := rpc.Dial("tcp", "localhost:9999")
+	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	args := Args2{uuid,""}
-	err = client.Call("Query.InitAvatar", args, &reply)
+	err = client.Call("Query.Lookup", args, &reply)
+	fmt.Println("lookup: " + reply)
+	client.Close()
 	byt := []byte(reply)
 	var dat map[string]interface{}
 	json.Unmarshal(byt, &dat)
@@ -363,16 +379,16 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	pid := dat["photoid"].(string)
 	nickname := dat["nickname"].(string)
 	avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
-	_ = err	
+	_ = err
 	_ = code
 	data := HomeInfo{
-		AvatarUrl : avatar_url,
+		//AvatarUrl : "\"" + avatar_url + "\"",
+		AvatarUrl :  avatar_url,
 		Nickname : nickname,
 	}
 
-	t, _ := template.ParseFiles("tpl/home.gtpl")
+	t := template.Must(template.ParseFiles("tpl/home.html"))
 	t.Execute(w, data)
-	
 
 }
 
@@ -382,18 +398,18 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 func editHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "cookie-name")
 	// Check if user is authenticated
-	if auth, ok := session.Values["authenticated"].(bool); auth {
-		fmt.Println("Already logged in ")
+	if auth, ok := session.Values["authenticated"].(bool); !auth {
+		fmt.Println("Login in first ")
 		_ = ok
-		http.Redirect(w, r, "/home", 302) // redirect to home page
+		http.Redirect(w, r, "/login", 302) // redirect to home page
 		//http.Error(w, "Forbidden", http.StatusForbidden)
 		//return
 	}
 
 	fmt.Println("method:", r.Method) //get request method
 	if r.Method == "GET" {
-	t, _ := template.ParseFiles("tpl/edit.gtpl")
-	t.Execute(w, nil)
+		t, _ := template.ParseFiles("tpl/edit.gtpl")
+		t.Execute(w, nil)
 	} else {
 
 	}
@@ -424,13 +440,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("password:", pwd)
 
 
-	client, err := rpc.Dial("tcp", "localhost:9999")
+	//client, err := rpc.Dial("tcp", "localhost:9999")
+	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
 	args := Args2{username,pwd}
 	var reply string
 	err = client.Call("Query.SignIn", args, &reply)
+	client.Close()
 
 	if err != nil {
 		log.Fatal("error:", err)

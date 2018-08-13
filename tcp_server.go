@@ -129,9 +129,27 @@ func lookup(uuid string) string {
 			panic(err)
 	    }
 	}
+	return "{\"code\":0,\"msg\":\"success\",\"nickname\":\"" + nname +"\",\"photoid\":\"" + photoID + "\"}"
+}
 
+
+func lookupAvatar(uuid string) string {
+	db := dbConn()
+
+	var photoID string
+	sqlStatement := `SELECT pid FROM avatar WHERE uuid=?`
+	row := db.QueryRow(sqlStatement, uuid)
+	err := row.Scan(&photoID)
+	if err != nil {
+	    if err == sql.ErrNoRows {
+		//fmt.Println("Zero rows found")
+			return "{\"code\":1,\"msg\":\"photo id failed\",\"data\":\"\"}"
+	    } else {
+			panic(err)
+	    }
+	}
 	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
-	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + photoID + "\",\"nickname\":\"" + nname + "\"}"
+	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + photoID + "\"}"
 }
 
 
@@ -175,7 +193,7 @@ func insertAvatar( uuid string, pid string) string {
 		return "{\"code\":1,\"msg\":\"already exists\"}"; //should NOT overwrite existing data
 	}
 */
-	stmt, err := db.Prepare("insert  avatar set  uuid=?,pid=?")
+	stmt, err := db.Prepare("insert into  avatar (uuid,pid)  values (?,?)")
 	checkErr(err)
 	res, err := stmt.Exec(uuid,pid)
 	checkErr(err)
@@ -239,6 +257,11 @@ func (t *Query) Lookup( args *Args2, reply *string) error{
 	return nil
 }
 
+
+func (t *Query) LookupAvatar( args *Args2, reply *string) error{
+	*reply = lookupAvatar(args.A)
+	return nil
+}
 func (t *Query) InitAvatar( args *Args2, reply *string) error{
 	*reply = insertAvatar(args.A, args.B)
 	return nil
