@@ -148,12 +148,12 @@ func signup(w http.ResponseWriter, r *http.Request) {
 			log.Fatal("Query.SignUp error:", err)
 		}
 		fmt.Println("check : %v",reply)	
-	byt := []byte(reply)
-	var dat map[string]interface{}
-	if err := json.Unmarshal(byt, &dat); err != nil {
-		fmt.Println("careful :" + reply)
-		panic(err)
-	}
+		byt := []byte(reply)
+		var dat map[string]interface{}
+		if err := json.Unmarshal(byt, &dat); err != nil {
+			fmt.Println("careful :" + reply)
+			panic(err)
+		}
 		code := dat["code"].(float64)
 		uuid := dat["uuid"].(string)
 		msg := dat["msg"].(string)
@@ -365,7 +365,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	//pid := session.Values["photoid"].(string)
 	uuid := session.Values["uuid"].(string)
 	var reply string
-
+	fmt.Println("uuid in sess :" + uuid )
 	//client, err := rpc.Dial("tcp", "localhost:9999")
 	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 	args := Args2{uuid,""}
@@ -472,7 +472,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("failed to login")
 		http.Redirect(w,r,"/login", 302)
 	}
-	fmt.Println("uuid: %s",uuid)
+	fmt.Println("check login uuid: %s",uuid)
 	//fmt.Println(dat)	
 	//communicate with tcp server and proxy server
 	session.Values["authenticated"] = true
