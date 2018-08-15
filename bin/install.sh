@@ -1,3 +1,10 @@
+#!/bin/sh
+
+path=`dirname $0`
+curr=`pwd`
+exe=$curr/$path/
+cd $exe
+
 #cd $GOPATH/src
 #git clone git://github.com/alphazero/Go-Redis.git redis
 #cd redis
@@ -14,6 +21,8 @@ go get github.com/google/uuid
 #build 
 cd ../pkg
 go build ../src/tcp_server/tcp_server.go
+mv tcp_server tcp/
 go build ../src/http_server/web_server.go
-
+mv web_server web/
+cp -r ../src/http_server/tpl web/
 
