@@ -12,47 +12,44 @@ import (
 	"strings"
 	"net"
 	"net/rpc"
-	"redis"
+	"util"
     )
 
-func redisPut( key string, val string) bool {
-	spec := redis.DefaultSpec().Db(0).Password("")
-	client, e := redis.NewSynchClientWithSpec(spec)
-	if e != nil {
-		log.Println("failed to create redis client", e)
-		return false
-	}
-	value := []byte(val)
-	e = client.Set(key, value)
-	if e == nil{
-		return true
-	}
-	return false
+type mysqlCli struct{
+	db *sql.DB
 }
 
-func redisGet( key string) string {
-	spec := redis.DefaultSpec().Db(0).Password("")
-	client, e := redis.NewSynchClientWithSpec(spec)
-	if e != nil {
-		log.Println("failed to create the client", e)
-		return "NULL"
+var mCli *mysqlCli = nil
+
+func Connect()( db *sql.DB, err error){
+	if  mCli == nil{
+		mCli = new(mysqlCli)
+		var err error
+		dbDriver := "mysql"
+		dbUser := "root"
+		dbPass := "HappyAlejandroSeaah999"
+		dbName := "UserDB"
+		dbAddr := "198.13.43.63:3306"
+		mCli.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
+		if err != nil {
+			panic(err.Error())
+			return nil, err
+		}
 	}
-	value, e := client.Get(key)
-	if e != nil {
-		log.Println("error on Get", e)
-		return "NULL"
+		return mCli.db ,nil
+}
+
+func Close(){
+	if mCli != nil {
+		mCli.db.Close()
 	}
-	fmt.Println("redisGet: " + string(value[:]))
-	return string(value[:])
 }
 
 func uuID() string {
-
     out, err := exec.Command("uuidgen").Output()
     if err != nil {
         log.Fatal(err)
     }
-    //fmt.Printf("%s", out)
     return strings.Replace(string(out), "\n", "", -1)
 }
 
@@ -64,166 +61,79 @@ func checkErr(err error) {
 }
 
 func hash(s string) string {
-        h := fnv.New64a()
-        h.Write([]byte(s))
-        return strconv.FormatUint(h.Sum64(), 10)
-	//return strconv.Itoa(h.Sum64())
-}
-
-func dbConn() (db *sql.DB) {
-    dbDriver := "mysql"
-    dbUser := "root"
-    dbPass := "HappyAlejandroSeaah999"
-    dbName := "UserDB"
-    dbAddr := "198.13.43.63:3306"
-    db, err := sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
-    if err != nil {
-        panic(err.Error())
-    }
-    return db
+	h := fnv.New64a()
+	h.Write([]byte(s))
+	return strconv.FormatUint(h.Sum64(), 10)
 }
 
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
 	//redis format :  username:realname
-	resp := redisGet( "user:" + realname)
+	resp := util.RedisGet( "user:" + realname)
 	fmt.Println(resp)
 	if resp != "" {
-		fmt.Println("Already exists!")
+		log.Println(realname +" already exists!")
 		return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\",\"uuid\":\"\"}"
 	}
 
 	uuid := uuID()
-	db :=dbConn()
-	//checkErr(err)
-	// check if realname already exists ,if so , insert fail
-	//todo : should replace this part to redis
-/*
-	var idNum int
-	sqlStatement := `SELECT count(*) FROM user  WHERE realname=?`
-	row := db.QueryRow(sqlStatement, realname)
-	err := row.Scan(&idNum)
-	if idNum > 0 {
-			return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\"}"
-	}
-*/
+	db, err :=Connect()
 	stmt, err := db.Prepare("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?")
 	checkErr(err)
 	hashedPwd :=string(hash(pwd))
-	fmt.Println(hashedPwd)
 	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
 	_ = es
-	//fmt.Println(err)
-	redisPut("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
-	redisPut("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
+	log.Println(err)
+	util.RedisPut("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
+	util.RedisPut("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
 	return login(realname ,pwd)
-	//return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid +"\"}";
 }
 
 func login(realname string, pwd string) string {
 	hashedPwd :=string(hash(pwd))
-	//var uuid string
-	/*
-	db := dbConn()
-	var uuid string
-	sqlStatement := `SELECT uuid FROM user WHERE realname=? and pwd=?`
-	row := db.QueryRow(sqlStatement, realname, hashedPwd)
-	err := row.Scan(&uuid)
-	if err != nil {
-	    if err == sql.ErrNoRows {
-		//fmt.Println("Zero rows found")
-			return "{\"code\":1,\"msg\":\"failed\",\"data\":\"\"}"
-	    } else {
-			panic(err)
-	    }
-	}
-	*/
-	resp := redisGet("user:"+realname)
+	resp := util.RedisGet("user:"+realname)
 	if resp == "" {
 		return "{\"code\":1,\"msg\":\"fail\",\"uuid\":\"\"}"
 	}
 	uuid_pwd_nickname := strings.Split(resp,"_")
-	fmt.Println("check upn: " + resp)
+	log.Println("check upn: " + resp)
+	log.Println("check uuid: " + uuid_pwd_nickname[0] )
+	log.Println("check pwd: " + uuid_pwd_nickname[1] )
+	log.Println("check nn: " + uuid_pwd_nickname[2] )
 
 	if hashedPwd != uuid_pwd_nickname[1]{
 		return "{\"code\":1,\"msg\":\"failed\",\"uuid\":\"\"}"
-	}
-	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
-	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid_pwd_nickname[2] + "\"}"
+	}	
+	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid_pwd_nickname[0] + "\"}"
 }
 
 
 func lookup(uuid string) string {
 	// lookup the redis cache first
-	/*
-	// if Not found , just return, deprected
-	db := dbConn()
-	var nname string
-	var photoID string
-	sqlStatement := `SELECT nickname FROM user WHERE uuid=?`
-	row := db.QueryRow(sqlStatement, uuid)
-	err := row.Scan(&nname)
-	if err != nil {
-	    if err == sql.ErrNoRows {
-		//fmt.Println("Zero rows found")
-			return "{\"code\":1,\"msg\":\"failed\",\"data\":\"\"}"
-	    } else {
-			panic(err)
-	    }
-	}	
-	sqlStatement = `SELECT pid FROM avatar WHERE uuid=?`
-	row = db.QueryRow(sqlStatement, uuid)
-	err = row.Scan(&photoID)
-	if err != nil {
-	    if err == sql.ErrNoRows {
-		//fmt.Println("Zero rows found")
-			return "{\"code\":2,\"msg\":\"photo id failed\",\"data\":\"\"}"
-	    } else {
-			panic(err)
-	    }
-	}
-	*/
-	photoID := redisGet("uuid_pid:"+uuid)
+	photoID := util.RedisGet("uuid_pid:"+uuid)
 	if photoID ==""{
 		return "{\"code\":2,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
-	fmt.Println("see what: " + uuid)
-	resp := redisGet("uuid:"+uuid)
+
+	resp := util.RedisGet("uuid:"+uuid)
 	if resp == "" {
 		return "{\"code\":3,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
 
-	id_pwd_pid_rn := strings.Split(resp,"_")
-	return "{\"code\":0,\"msg\":\"success\",\"nickname\":\"" + id_pwd_pid_rn[3] +"\",\"photoid\":\"" + photoID + "\"}"
+	id_pwd_pid_nn_rn := strings.Split(resp,"_")
+	return "{\"code\":0,\"msg\":\"success\",\"nickname\":\"" + id_pwd_pid_nn_rn[2] +"\",\"photoid\":\"" + photoID + "\"}"
 }
 
 
 func lookupAvatar(uuid string) string {
-	
-	
-	// find it in redis cache
-
-	// if NOT found
-
-	db := dbConn()
-	var photoID string
-	sqlStatement := `SELECT pid FROM avatar WHERE uuid=?`
-	row := db.QueryRow(sqlStatement, uuid)
-	err := row.Scan(&photoID)
-	if err != nil {
-	    if err == sql.ErrNoRows {
-		//fmt.Println("Zero rows found")
-			return "{\"code\":1,\"msg\":\"photo id failed\",\"data\":\"\"}"
-	    } else {
-			panic(err)
-	    }
-	}
+    resp := util.RedisGet("uuid_pid:" +uuid)
+	log.Println("lookup avatar : " + resp)
 	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
-	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + photoID + "\"}"
+	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + resp + "\"}"
 }
 
 
 func updateNickname( uuid string, nickname string) string {
-	db := dbConn()
+	db, _ := Connect()
 	var idNum int
 	sqlStatement := `SELECT count(*) FROM user WHERE uuid=?`
 	row := db.QueryRow(sqlStatement, uuid)
@@ -253,7 +163,8 @@ func updateNickname( uuid string, nickname string) string {
 
 
 func insertAvatar( uuid string, pid string) string {
-	db := dbConn()
+	db,_ := Connect()
+	log.Println("inser avatar : " + uuid + " with pid : " + pid)
 	//check uuid
 /*	var idNum int
         sqlStatement := `SELECT count(*) FROM avatar  WHERE uuid=?`
@@ -270,7 +181,7 @@ func insertAvatar( uuid string, pid string) string {
 	affect, err := res.RowsAffected()
 	if affect > 0 {
 		// update redis cache
-		redisPut("uuid_pid:"+uuid,pid)
+		util.RedisPut("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
 	} else {
 		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
@@ -280,7 +191,7 @@ func insertAvatar( uuid string, pid string) string {
 
 
 func updateAvatar( uuid string, pid string) string {
-	db := dbConn()
+	db, _ := Connect()
 	stmt, err := db.Prepare("update avatar set pid=? where uuid=?")
 	checkErr(err)
 	res, err := stmt.Exec(pid, uuid)
@@ -347,12 +258,21 @@ func (t *Query) ChangeAvatar( args *Args2, reply *string) error{
 }
 
 func main() {
-	/*fmt.Println(insertUser("kljrealabcd","nick","pwd","avatar"))
-	fmt.Println(updateNickname( "7c6ff5a0-137f-484a-bc71-ab63d7b1d9b4", "ppptring"))
-	fmt.Println(login("kljrcd","pwd"))
-	fmt.Println(insertAvatar( "abcd", "pid string"))
-	fmt.Println(updateAvatar( "abcd", "pitring"))
-	*/
+
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	f, err := os.OpenFile( dir + "/../log/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+
+	log.SetOutput(f)
+
+
     teller := new(Query)
     rpc.Register(teller)
 
@@ -368,5 +288,5 @@ func main() {
             continue
         }
         rpc.ServeConn(conn)
-    }	
+	}	
 }
