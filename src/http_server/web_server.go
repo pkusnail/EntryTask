@@ -50,7 +50,6 @@ func  getMillSec() int64{ // return timestamp
 }
 
 func signup(w http.ResponseWriter, r *http.Request) {
-
 	if r.Method == "GET" {
 		var rname, nname, info  []string
 		var ok bool
@@ -222,9 +221,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uuid := session.Values["uuid"].(string)	
-
-	log.Println("upload handler uuid : " + uuid )
-
 	if r.Method == "GET" {
 		crutime := time.Now().Unix()
 		h := md5.New()
@@ -307,89 +303,33 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		http.Redirect(w, r, "/signup", 302)
 	}
-	uuid := session.Values["uuid"].(string)
-	log.Println("edit handler uuid : " + uuid )
 
+	uuid := session.Values["uuid"].(string)	
 	if r.Method == "GET" {
 		crutime := time.Now().Unix()
 		h := md5.New()
 		io.WriteString(h, strconv.FormatInt(crutime, 10))
 		token := fmt.Sprintf("%x", h.Sum(nil))
+
 		t, _ := template.ParseFiles("tpl/edit.gtpl")
 		t.Execute(w, token)
 	} else {
-		r.ParseMultipartForm(32 << 20)
-		file, handler, err := r.FormFile("uploadfile")
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-		defer file.Close()
-
-		info := handler.Header["Content-Disposition"]
-		info1 := strings.Split(strings.Join(info,""),"filename=\"")
-		info2 := strings.Split(info1[1],"\"")
-		uploadedFileName := info2[0]
-		if uploadedFileName != ""  && handler.Filename != "" {
-			f, err := os.OpenFile("../../tmp/" + handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
-			if err != nil {
-				log.Println(err)
-				return
-			}
-			defer f.Close()
-			io.Copy(f, file)
-			localFile := "../../tmp/" + uploadedFileName
-			photoID := upload_help(localFile)
+		r.ParseForm()
+		var reply string
+		nickname := strings.Join(r.Form["nname"],"")
+		log.Println("nn " + nickname)
+		if len(nickname) > 0 {
 			client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-			if err != nil {
-				log.Println(err)
-			}
-
-			// delete file
-			if photoID != "NULL" {
-				session.Values["photoid"] = photoID
-				session.Save(r, w)
-				log.Println("saved")
-				//update db	
-				var reply string
-				args := util.Args2{ uuid, photoID}
-				err = client.Call("Query.ChangeAvatar", args, &reply)
-				client.Close()
-				if err != nil {
-					log.Fatal(err)
-				}
-				log.Println("reply: " + reply)
-				byt := []byte(reply)
-				var dat map[string]interface{}
-				if err := json.Unmarshal(byt, &dat); err != nil {
-					panic(err)
-				}
-				_ = err
-				code := dat["code"].(float64)
-				log.Println(code)
-				if code != 0 {
-					log.Println("failed to upload db")
-					http.Redirect(w, r, "/upload", 302)
-				}
-				os.Remove(localFile)
-			}
-
-			nickname, ok := r.URL.Query()["nname"]
-			if  ok {
-				args := util.Args2{ uuid,strings.Join(nickname,"") }
-				//client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-				var reply string
-				err = client.Call("Query.updateNickname", args, &reply)
-				_ = reply
-			}
+			_ = err
+			args := util.Args2{ uuid, nickname}
+			err = client.Call("Query.ChangeNickname", args, &reply)
 			client.Close()
-			http.Redirect(w, r, "/home", 302)
-		}else{//
-			http.Redirect(w, r, "/upload", 302)
+			_ = reply
 		}
+		
+		http.Redirect(w, r, "/home", 302)
 	}
 }
-
 
 
 

@@ -139,6 +139,25 @@ func updateNickname( uuid string, nickname string) string {
 	_ = affect
 	checkErr(err)
 	// update redis cache
+	fmt.Println("nickname change: " + nickname)
+	fmt.Println("uuid: " + uuid)
+
+	uuid_pid_nn_rn := util.RedisGet("uuid:"+uuid)
+	log.Println("wtf")
+	log.Println(uuid_pid_nn_rn)
+
+	upnr := strings.Split(uuid_pid_nn_rn,"_")
+	util.RedisPut("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
+	log.Println(upnr[0])
+	log.Println(upnr[1])
+	log.Println(upnr[2])
+	log.Println(upnr[3])
+
+	uuid_pwd_nn := util.RedisGet("uuid:" + upnr[3])
+	upn := strings.Split(uuid_pwd_nn,"_")
+	log.Println("upn: " + uuid_pwd_nn)
+	//util.RedisPut("uuid:"+uuid, uuid +"_"+upn[1]+"_"+nickname)
+	_=upn
 	return "{\"code\":0,\"msg\":\"\"}";
 }
 
@@ -207,6 +226,12 @@ func (t *Query) InitAvatar( args *util.Args2, reply *string) error{
 
 func (t *Query) ChangeAvatar( args *util.Args2, reply *string) error{
 	*reply = updateAvatar(args.A, args.B)
+	return nil
+}
+
+
+func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
+	*reply = updateNickname(args.A, args.B)
 	return nil
 }
 
