@@ -102,7 +102,7 @@ func login(realname string, pwd string) string {
 
 	if hashedPwd != uuid_pwd_nickname[1]{
 		return "{\"code\":1,\"msg\":\"failed\",\"uuid\":\"\"}"
-	}	
+	}
 	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid_pwd_nickname[0] + "\"}"
 }
 
@@ -113,12 +113,10 @@ func lookup(uuid string) string {
 	if photoID ==""{
 		return "{\"code\":2,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
-
 	resp := util.RedisGet("uuid:"+uuid)
 	if resp == "" {
 		return "{\"code\":3,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
-
 	id_pwd_pid_nn_rn := strings.Split(resp,"_")
 	return "{\"code\":0,\"msg\":\"success\",\"nickname\":\"" + id_pwd_pid_nn_rn[2] +"\",\"photoid\":\"" + photoID + "\"}"
 }
@@ -130,7 +128,6 @@ func lookupAvatar(uuid string) string {
 	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
 	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + resp + "\"}"
 }
-
 
 func updateNickname( uuid string, nickname string) string {
 	db, _ := Connect()
@@ -156,11 +153,8 @@ func updateNickname( uuid string, nickname string) string {
 	_ = affect
 	checkErr(err)
 	// update redis cache
-
-
 	return "{\"code\":0,\"msg\":\"\"}";
 }
-
 
 func insertAvatar( uuid string, pid string) string {
 	db,_ := Connect()
@@ -179,7 +173,6 @@ func insertAvatar( uuid string, pid string) string {
 	}
 }
 
-
 func updateAvatar( uuid string, pid string) string {
 	db, _ := Connect()
 	stmt, err := db.Prepare("update avatar set pid=? where uuid=?")
@@ -189,8 +182,7 @@ func updateAvatar( uuid string, pid string) string {
 	affect, err := res.RowsAffected()
 	_ = affect
 	if affect > 0 {
-		//update redis cache
-	
+		//update redis cache	
 		return "{\"code\":0,\"msg\":\"success\"}";
 	} else {
 		return "{\"code\":1,\"msg\":\"failed to update avatar\"}";
@@ -198,51 +190,36 @@ func updateAvatar( uuid string, pid string) string {
 	//checkErr(err)
 }
 
-//===================
-type Args2 struct {
-	A,B string
-}
-
-type Args3 struct {
-	A,B,C string
-}
-
-
-type Args4 struct {
-	A,B,C,D string
-}
-
-
 type Query string
 
-func (t *Query) SignUp( args *Args4, reply *string) error{
+func (t *Query) SignUp( args *util.Args4, reply *string) error{
 	*reply = insertUser(args.A, args.B, args.C, args.D)
 	return nil
 }
 
-func (t *Query) SignIn( args *Args2, reply *string) error{
+func (t *Query) SignIn( args *util.Args2, reply *string) error{
 	*reply = login(args.A, args.B)
 	return nil
 }
 
 
 
-func (t *Query) Lookup( args *Args2, reply *string) error{
+func (t *Query) Lookup( args *util.Args2, reply *string) error{
 	*reply = lookup(args.A)
 	return nil
 }
 
 
-func (t *Query) LookupAvatar( args *Args2, reply *string) error{
+func (t *Query) LookupAvatar( args *util.Args2, reply *string) error{
 	*reply = lookupAvatar(args.A)
 	return nil
 }
-func (t *Query) InitAvatar( args *Args2, reply *string) error{
+func (t *Query) InitAvatar( args *util.Args2, reply *string) error{
 	*reply = insertAvatar(args.A, args.B)
 	return nil
 }
 
-func (t *Query) ChangeAvatar( args *Args2, reply *string) error{
+func (t *Query) ChangeAvatar( args *util.Args2, reply *string) error{
 	*reply = updateAvatar(args.A, args.B)
 	return nil
 }

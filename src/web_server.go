@@ -18,6 +18,7 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"github.com/gorilla/sessions"
+	"util"
 )
 
 const (
@@ -25,23 +26,6 @@ const (
 	CONN_PORT = "9999"
 	CONN_TYPE = "tcp"
 )
-
-type Args struct {
-    A, B string
-}
-
-type Args2 struct {
-        A,B string
-}
-
-type Args3 struct {
-        A,B,C string
-}
-
-
-type Args4 struct {
-        A,B,C,D string
-}
 
 type Register struct {
 	realname string
@@ -116,7 +100,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 			fmt.Println(err)
 			log.Fatal("dialing:", err)
 		}
-		args := Args4{realname,nickname,pwd1,""}
+		args := util.Args4{realname,nickname,pwd1,""}
 		var reply string
 		err = client.Call("Query.SignUp", args, &reply)
 		client.Close()
@@ -276,7 +260,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				fmt.Println(err)
 			}
 
-			args := Args2{ uuid, photoID}
+			args := util.Args2{ uuid, photoID}
 			err = client.Call("Query.InitAvatar", args, &reply)
 			client.Close()
 			if err != nil {
@@ -320,7 +304,7 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	var reply string
 	log.Println("uuid in sess :" + uuid )
 	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-	args := Args2{uuid,""}
+	args := util.Args2{uuid,""}
 	err = client.Call("Query.Lookup", args, &reply)
 	log.Println("lookup: " + reply)
 	client.Close()
@@ -389,7 +373,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatal("dialing:", err)
 	}
-	args := Args2{username,pwd}
+	args := util.Args2{username,pwd}
 	var reply string
 	err = client.Call("Query.SignIn", args, &reply)
 	client.Close()
