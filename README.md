@@ -98,9 +98,9 @@ With the simple connection between them, it is easy to split database when neces
 
 ## Redis Scheme Design
 
-### user:{realname}  => {uuid}_{pwd}_{nickname} 
+### user:{realname}  => {uuid} _ {pwd} _ {nickname} 
 for login lookup
-### uuid:{uuid} => {uuid}_{photoId}_{nickname}_{realname}
+### uuid:{uuid} => {uuid} _ {photoId} _ {nickname} _ {realname}
 
 ### uuid_pid:{uuid} = > {photoId}
 for personal home page  query

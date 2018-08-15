@@ -165,15 +165,6 @@ func updateNickname( uuid string, nickname string) string {
 func insertAvatar( uuid string, pid string) string {
 	db,_ := Connect()
 	log.Println("inser avatar : " + uuid + " with pid : " + pid)
-	//check uuid
-/*	var idNum int
-        sqlStatement := `SELECT count(*) FROM avatar  WHERE uuid=?`
-        row := db.QueryRow(sqlStatement, uuid)
-        err := row.Scan(&idNum)
-	if idNum > 0 {
-		return "{\"code\":1,\"msg\":\"already exists\"}"; //should NOT overwrite existing data
-	}
-*/
 	stmt, err := db.Prepare("insert into  avatar (uuid,pid)  values (?,?)")
 	checkErr(err)
 	res, err := stmt.Exec(uuid,pid)
@@ -186,7 +177,6 @@ func insertAvatar( uuid string, pid string) string {
 	} else {
 		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
 	}
-	//checkErr(err)
 }
 
 
