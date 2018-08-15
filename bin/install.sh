@@ -13,7 +13,7 @@ go get github.com/google/uuid
 
 #build 
 cd ../pkg
-go build ../src/tcp_server.go
-go build ../src/web_server.go
+go build ../src/tcp_server/tcp_server.go
+go build ../src/http_server/web_server.go
 
 
