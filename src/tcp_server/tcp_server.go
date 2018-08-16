@@ -229,35 +229,20 @@ func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
 }
 
 func main() {
-	/*
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	conf = util.ConfReader(dir + "/../../conf/setting.conf")
-	logDir := conf["log_file_dir"].(string)
-	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
-*/
-    teller := new(Query)
-    rpc.Register(teller)
+	teller := new(Query)
+	rpc.Register(teller)
 
 	tcp_host := conf["tcp_server_host"].(string)
 	tcp_port := conf["tcp_server_port"].(string)
 	tcp_addr := tcp_host + ":" + tcp_port
-    tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
-    listener, err := net.ListenTCP("tcp", tcpAddr)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
+	listener, err := net.ListenTCP("tcp", tcpAddr)
 	_ = err
-    for {
-        conn, err := listener.Accept()
-        if err != nil {
-            continue
-        }
-        rpc.ServeConn(conn)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			continue
+		}
+		rpc.ServeConn(conn)
 	}
 }
