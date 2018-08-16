@@ -3,7 +3,6 @@ package main
 import (
 	_ "github.com/go-sql-driver/mysql"
 	"database/sql"
-	"fmt"
 	"os"
 	"log"
 	"os/exec"
@@ -19,45 +18,59 @@ type mysqlCli struct{
 	db *sql.DB
 }
 
-var mCli *mysqlCli = nil
+//var mCli *mysqlCli = nil
+var mCli *mysqlCli
 
-func Connect()( db *sql.DB, err error){
-	if  mCli == nil{
-		mCli = new(mysqlCli)
+func init(){
+	mCli = &mysqlCli{db:nil}
+}
+
+func (my *mysqlCli ) Connect() {
+	if  my.db == nil{
 		var err error
 		dbDriver := "mysql"
 		dbUser := "root"
 		dbPass := "HappyAlejandroSeaah999"
 		dbName := "UserDB"
 		dbAddr := "198.13.43.63:3306"
-		mCli.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
+		my.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
 		if err != nil {
-			panic(err.Error())
-			return nil, err
+			log.Println(err.Error())
 		}
 	}
-		return mCli.db ,nil
 }
 
-func Close(){
-	if mCli != nil {
-		mCli.db.Close()
+func (my *mysqlCli) Close(){
+	if my.db != nil {
+		my.db.Close()
 	}
 }
 
+func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
+	my.Connect()
+	stmt, err := my.db.Prepare(sql)
+	if len(paras) == 1 {
+		_, err =stmt.Exec(paras[0])
+	}else if len(paras) == 2 {
+		_, err =stmt.Exec(paras[0], paras[1])
+	}else if len(paras) == 3 {
+		_, err =stmt.Exec(paras[0],paras[1] , paras[2])
+	}else if len(paras) == 4 {
+		_, err =stmt.Exec(paras[0],paras[1] , paras[2], paras[3])
+	}
+
+	if err == nil{
+		return true
+	}else{
+		return false
+	}
+}
 func uuID() string {
     out, err := exec.Command("uuidgen").Output()
     if err != nil {
         log.Fatal(err)
     }
     return strings.Replace(string(out), "\n", "", -1)
-}
-
-func checkErr(err error) {
-    if err != nil {
-        fmt.Println("Fatal error ", err.Error())
-        os.Exit(1)
-    }
 }
 
 func hash(s string) string {
@@ -69,20 +82,25 @@ func hash(s string) string {
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
 	//redis format :  username:realname
 	resp := util.RedisGet( "user:" + realname)
-	fmt.Println(resp)
 	if resp != "" {
 		log.Println(realname +" already exists!")
 		return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\",\"uuid\":\"\"}"
 	}
 
 	uuid := uuID()
+	hashedPwd :=string(hash(pwd))
+	/*
 	db, err :=Connect()
 	stmt, err := db.Prepare("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?")
-	checkErr(err)
-	hashedPwd :=string(hash(pwd))
 	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
 	_ = es
 	log.Println(err)
+	*/
+	if mCli.db == nil{
+		log.Println("mysql client is nil")
+	}
+
+	mCli.Inquery("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?",uuid, realname,nickname,hashedPwd)
 	util.RedisPut("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
 	util.RedisPut("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
 	return login(realname ,pwd)
@@ -130,20 +148,10 @@ func lookupAvatar(uuid string) string {
 }
 
 func updateNickname( uuid string, nickname string) string {
-	db, _ := Connect()
-	stmt, err := db.Prepare("update user set nickname=? where uuid=?")
-	checkErr(err)
-	res, err := stmt.Exec(nickname, uuid)
-	checkErr(err)
-	affect, err := res.RowsAffected()
-	_ = affect
-	checkErr(err)
+	mCli.Inquery("update user set nickname=? where uuid=?",nickname, uuid)
 	// update redis cache
-	fmt.Println("nickname change: " + nickname)
-	fmt.Println("uuid: " + uuid)
 
 	uuid_pid_nn_rn := util.RedisGet("uuid:"+uuid)
-	log.Println("wtf")
 	log.Println(uuid_pid_nn_rn)
 
 	upnr := strings.Split(uuid_pid_nn_rn,"_")
@@ -162,14 +170,9 @@ func updateNickname( uuid string, nickname string) string {
 }
 
 func insertAvatar( uuid string, pid string) string {
-	db,_ := Connect()
-	log.Println("inser avatar : " + uuid + " with pid : " + pid)
-	stmt, err := db.Prepare("insert into  avatar (uuid,pid)  values (?,?)")
-	checkErr(err)
-	res, err := stmt.Exec(uuid,pid)
-	checkErr(err)
-	affect, err := res.RowsAffected()
-	if affect > 0 {
+	sql := "insert into  avatar (uuid,pid)  values (?,?)"
+	affect := mCli.Inquery(sql, uuid, pid)
+	if affect  {
 		// update redis cache
 		util.RedisPut("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
@@ -179,20 +182,14 @@ func insertAvatar( uuid string, pid string) string {
 }
 
 func updateAvatar( uuid string, pid string) string {
-	db, _ := Connect()
-	stmt, err := db.Prepare("update avatar set pid=? where uuid=?")
-	checkErr(err)
-	res, err := stmt.Exec(pid, uuid)
-	checkErr(err)
-	affect, err := res.RowsAffected()
-	_ = affect
-	if affect > 0 {
+
+	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
+	if affect {
 		//update redis cache	
 		return "{\"code\":0,\"msg\":\"success\"}";
 	} else {
 		return "{\"code\":1,\"msg\":\"failed to update avatar\"}";
 	}
-	//checkErr(err)
 }
 
 type Query string
@@ -207,18 +204,16 @@ func (t *Query) SignIn( args *util.Args2, reply *string) error{
 	return nil
 }
 
-
-
 func (t *Query) Lookup( args *util.Args2, reply *string) error{
 	*reply = lookup(args.A)
 	return nil
 }
 
-
 func (t *Query) LookupAvatar( args *util.Args2, reply *string) error{
 	*reply = lookupAvatar(args.A)
 	return nil
 }
+
 func (t *Query) InitAvatar( args *util.Args2, reply *string) error{
 	*reply = insertAvatar(args.A, args.B)
 	return nil
@@ -229,47 +224,36 @@ func (t *Query) ChangeAvatar( args *util.Args2, reply *string) error{
 	return nil
 }
 
-
 func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
 	*reply = updateNickname(args.A, args.B)
 	return nil
 }
 
-
 var conf = make(map[string]interface{})
 
 func main() {
-
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-
 	conf = util.ConfReader(dir + "/../../conf/setting.conf")
 	logDir := conf["log_file_dir"].(string)
-	tcp_host := conf["tcp_server_host"].(string)
-	tcp_port := conf["tcp_server_port"].(string)
-
-	tcp_addr := tcp_host + ":" + tcp_port
 	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
 	defer f.Close()
-
 	log.SetOutput(f)
-
 
     teller := new(Query)
     rpc.Register(teller)
 
-
+	tcp_host := conf["tcp_server_host"].(string)
+	tcp_port := conf["tcp_server_port"].(string)
+	tcp_addr := tcp_host + ":" + tcp_port
     tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
-    checkErr(err)
-
     listener, err := net.ListenTCP("tcp", tcpAddr)
-    checkErr(err)
 
     for {
         conn, err := listener.Accept()

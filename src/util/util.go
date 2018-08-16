@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"redis"
 	"log"
 	"bufio"
@@ -37,7 +36,6 @@ func RedisGet( key string) string {
 		log.Println("error on Get", e)
 		return "NULL"
 	}
-	fmt.Println("redisGet: " + string(value[:]))
 	return string(value[:])
 }
 
