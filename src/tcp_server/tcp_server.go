@@ -13,8 +13,8 @@ import (
 	"net/rpc"
 	"util"
 	"time"
-    "github.com/garyburd/redigo/redis"
-    )
+	"github.com/garyburd/redigo/redis"
+)
 
 var conf = make(map[string]interface{})
 
@@ -131,7 +131,7 @@ func hash(s string) string {
 }
 
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
-    startTime := time.Now()
+	startTime := time.Now()
 	//redis format :  username:realname
 	resp := redisGet( "user:" + realname)
 	if resp != "" {
@@ -148,7 +148,7 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 
 	redisSet("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
 	redisSet("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
-    log.Println("insertUser consumed：", time.Now().Sub(startTime))
+	log.Println("insertUser consumed：", time.Now().Sub(startTime))
 	return login(realname ,pwd)
 }
 
@@ -189,16 +189,16 @@ func lookup(uuid string) string {
 }
 
 func lookupAvatar(uuid string) string {
-    startTime := time.Now()
-    resp := redisGet("uuid_pid:" +uuid)
+	startTime := time.Now()
+	resp := redisGet("uuid_pid:" +uuid)
 	log.Println("lookup avatar : " + resp)
-    log.Println("lookupAvatar consumed：", time.Now().Sub(startTime))
+	log.Println("lookupAvatar consumed：", time.Now().Sub(startTime))
 	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
 	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + resp + "\"}"
 }
 
 func updateNickname( uuid string, nickname string) string {
-    startTime := time.Now()
+	startTime := time.Now()
 	mCli.Inquery("update user set nickname=? where uuid=?",nickname, uuid)
 	uuid_pid_nn_rn := redisGet("uuid:"+uuid)
 	log.Println(uuid_pid_nn_rn)
@@ -213,15 +213,15 @@ func updateNickname( uuid string, nickname string) string {
 	upn := strings.Split(uuid_pwd_nn,"_")
 	log.Println("upn: " + uuid_pwd_nn)
 	_=upn
-    log.Println("updateNickname consumed：", time.Now().Sub(startTime))
+	log.Println("updateNickname consumed：", time.Now().Sub(startTime))
 	return "{\"code\":0,\"msg\":\"\"}";
 }
 
 func insertAvatar( uuid string, pid string) string {
-    startTime := time.Now()
+	startTime := time.Now()
 	sql := "insert into  avatar (uuid,pid)  values (?,?)"
 	affect := mCli.Inquery(sql, uuid, pid)
-    log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
+	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
 	if affect  {
 		redisSet("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
@@ -231,9 +231,9 @@ func insertAvatar( uuid string, pid string) string {
 }
 
 func updateAvatar( uuid string, pid string) string {
-    startTime := time.Now()
+	startTime := time.Now()
 	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
-    log.Println("updateAvatar consumed：", time.Now().Sub(startTime))
+	log.Println("updateAvatar consumed：", time.Now().Sub(startTime))
 	if affect {
 		//update redis cache	
 		return "{\"code\":0,\"msg\":\"success\"}";
