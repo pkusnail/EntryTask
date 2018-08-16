@@ -2,7 +2,10 @@
 
 http://alejandroseaah.com:9090/signup
 
+![image](http://alejandroseaah.com:4869/e312ec884c7c408d49d57f161e6215c7)
+
 http://alejandroseaah.com:9090/login
+![image](http://alejandroseaah.com:4869/a666f47c3bbdb7e9bf0867c5fc11e0a1)
 
 http://alejandroseaah.com:9090/home
 
