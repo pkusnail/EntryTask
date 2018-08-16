@@ -69,9 +69,9 @@ func ConfReader(path string) map[string]interface{} {
 
 		}
 	}
-	fmt.Println("Check configuration : ")
+	log.Println("Check configuration : ")
 	for k, v := range conf {
-		fmt.Println(k," => ", v)
+		log.Println(k," => ", v)
 	}
 
 	return conf

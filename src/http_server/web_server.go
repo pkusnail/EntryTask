@@ -157,7 +157,8 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
                 "author":      "Matt Aimonetti",
                 "description": "A document with all the Go programming language secrets",
         }
-        request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
+        //request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
+        request, err := newfileUploadRequest(conf["image_upload_url"].(string), extraParams, "file", photoRelativePath)
         if err != nil {
             log.Fatal(err)
 			return "NULL"
@@ -221,14 +222,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		info2 := strings.Split(info1[1],"\"")
 		uploadedFileName := info2[0]
 
-		f, err := os.OpenFile("../../tmp/" + handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
+		f, err := os.OpenFile( conf["tmp_file_dir"].(string) + "/" + handler.Filename, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			log.Println(err)
 			return
 		}
 		defer f.Close()
 		io.Copy(f, file)
-		localFile := "../../tmp/" + uploadedFileName
+		localFile := conf["tmp_file_dir"].(string) + "/" + uploadedFileName
 		photoID := upload_help(localFile)
 
 		// delete file
@@ -335,7 +336,8 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	code := dat["code"].(float64)
 	pid := dat["photoid"].(string)
 	nickname := dat["nickname"].(string)
-	avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
+	//avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
+	avatar_url := conf["image_fetch_prefix"].(string) + "/"+ pid +"?w=600&h=600"
 	_ = err
 	_ = code
 	data := HomeInfo{
@@ -417,7 +419,6 @@ func main() {
 		log.Fatalf("error opening file: ", err)
 	}
 	defer f.Close()
-
 	log.SetOutput(f)
 
 	http.HandleFunc("/signup", signup)
