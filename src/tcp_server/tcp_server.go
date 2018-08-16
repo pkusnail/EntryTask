@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"log"
+	"fmt"
 	"os/exec"
 	"hash/fnv"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 	"util"
 	"time"
 	"runtime"
+	"encoding/json"
 	"github.com/garyburd/redigo/redis"
 )
 
@@ -222,6 +224,7 @@ func updateNickname( uuid string, nickname string) string {
 
 func insertAvatar( uuid string, pid string) string {
 	startTime := time.Now()
+	log.Println("avatar paras",uuid,pid)
 	sql := "insert into  avatar (uuid,pid)  values (?,?)"
 	affect := mCli.Inquery(sql, uuid, pid)
 	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
@@ -312,6 +315,58 @@ func init(){
 	log.Println("communication type  : " + commType)
 }
 
+
+
+// Handles incoming requests.
+func tcpRequestHandler(conn net.Conn) {
+	// Make a buffer to hold incoming data.
+	buf := make([]byte, 4096)
+	// Read the incoming connection into the buffer.
+	reqLen, err := conn.Read(buf)
+	_ = reqLen
+	if err != nil {
+		fmt.Println("Error reading:", err.Error())
+		conn.Close()
+		return
+	}
+	input := string(buf[:])
+	input = strings.Replace(input,"\x00","",-1)
+	log.Println("input: ", input)
+	reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
+	var paras []string
+	err = json.Unmarshal([]byte(input), &paras)	
+	if err != nil {
+		log.Println(err)
+		conn.Write([]byte(reply))
+		// Close the connection when you're done with it.
+		conn.Close()
+
+	}
+
+	switch paras[0] {
+	case "SignUp":
+		reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
+	case "InitAvatar":
+		reply = insertAvatar(paras[1], paras[2])+"\n"
+	case "ChangeNickname":
+		reply = updateNickname(paras[1], paras[2])+"\n"
+	case "Lookup":
+		reply = lookup(paras[1]) +"\n"
+	case "SignIn":
+		reply = login(paras[1], paras[2]) +"\n"
+	//default:
+	//	log.Println("parameter error : " + input)
+	}
+	log.Println("server resp :", reply)
+	// Send a response back to person contacting us
+	conn.Write([]byte(reply))
+	// Close the connection when you're done with it.
+	conn.Close()
+}
+
+
+
+
 func main() {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -325,14 +380,13 @@ func main() {
 	log.SetOutput(globalLogFile)
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	tcp_host := conf["tcp_server_host"].(string)
+	//tcp_host := conf["tcp_server_host"].(string)
 	tcp_port := conf["tcp_server_port"].(string)
-	tcp_addr := tcp_host + ":" + tcp_port
 
 	if commType == "rpc" {
 		teller := new(Query)
 		rpc.Register(teller)
-		tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
+		tcpAddr, err := net.ResolveTCPAddr("tcp", ":" + tcp_port)
 		listener, err := net.ListenTCP("tcp", tcpAddr)
 		_ = err
 		for {
@@ -345,7 +399,22 @@ func main() {
 	}
 
 	if commType == "tcp" {
-
+		l, err := net.Listen("tcp", ":" + tcp_port)
+		if err != nil {
+			log.Println("Error listening:", err.Error())
+			os.Exit(1)
+		}
+		defer l.Close()
+		log.Println("listening on ", tcp_port)
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Println("Error accepting: ", err.Error())
+				os.Exit(1)
+			}
+			// Handle connections in a new goroutine.
+			go tcpRequestHandler(conn)
+		}
 	}
 }
 

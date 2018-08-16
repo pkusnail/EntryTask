@@ -18,6 +18,8 @@ import (
 	"crypto/md5"
 	"encoding/json"
 	"github.com/gorilla/sessions"
+	"net"
+	"bufio"
 	"util"
 )
 
@@ -29,7 +31,13 @@ const (
 
 var commType = "tcp" // default tcp , can be rpc
 
-var client interface{} //*rpc.Client //, _ = rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+var conf = make(map[string]interface{})
+
+var tcp_server_addr = "loalhost:9999" //default
+
+var client interface{} //*rpc.Client  or tcp client
+
+//var tcpConn net.Conn
 
 type Register struct{ 
 	realname string
@@ -48,6 +56,20 @@ var (
 	store = sessions.NewCookieStore(key)
 )
 
+
+
+func tcpClient(input string) string {
+	log.Println("tcp input: ", input)
+	tcpConn, err := net.Dial("tcp", tcp_server_addr)
+	if err != nil{
+		log.Println(err)
+	}
+	fmt.Fprintf(tcpConn, input + "\n")
+    //message, _ := bufio.NewReader(client.(net.Conn)).ReadString('\n')
+    message, _ := bufio.NewReader(tcpConn).ReadString('\n')
+	log.Println("tcp resp : " , message)
+	return message
+}
 
 func  getMillSec() int64{ // return timestamp
 	return time.Now().UnixNano() / int64(time.Millisecond)
@@ -87,22 +109,30 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		nickname := strings.Join(r.Form["nname"],"")
 		pwd := strings.Join(r.Form["pwd"],"")
 		//communicate with tcp server and proxy server  
-		args := util.Args4{realname,nickname,pwd,""}
-		var reply string
-		client.(*rpc.Client).Call("Query.SignUp", args, &reply)
-		log.Println("check : ",reply)	
+		reply := ""
+
+		if commType == "rpc" {
+			args := util.Args4{ realname , nickname , pwd ,""}
+			client.(*rpc.Client).Call("Query.SignUp", args, &reply)
+		}
+		if commType == "tcp" {
+			reply = tcpClient("[\"SignUp\",\""+ realname+"\",\""+nickname+"\",\""+pwd+"\",\"\"]")
+		}
+
+		log.Println("check : ",reply)
 		byt := []byte(reply)
 		var dat map[string]interface{}
 		if err := json.Unmarshal(byt, &dat); err != nil {
 			log.Println("careful :" + reply)
 			panic(err)
 		}
+
 		code := dat["code"].(float64)
 		uuid := dat["uuid"].(string)
 		msg := dat["msg"].(string)
 		if code != 0 {
 			log.Println("Sign up failed, msg : %v",msg)
-			http.Redirect(w, r, "/signup", 302)	
+			http.Redirect(w, r, "/signup", 302)
 		}
 		log.Printf("uuid:%s\n",  uuid)
 
@@ -113,7 +143,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		session.Values["uuid"] = uuid
 		session.Save(r, w)
 		log.Println("signupHandler consumed：", time.Now().Sub(startTime))
-		http.Redirect(w, r, "/upload", 302)	
+		http.Redirect(w, r, "/upload", 302)
 	}
 }
 
@@ -242,8 +272,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			//update db	
 			var reply string
 
-			args := util.Args2{ uuid, photoID}
-			client.(*rpc.Client).Call("Query.InitAvatar", args, &reply)
+			if commType == "rpc" {
+				args := util.Args2{ uuid, photoID}
+				client.(*rpc.Client).Call("Query.InitAvatar", args, &reply)
+			}
+			if commType == "tcp" {
+				reply = tcpClient("[\"InitAvatar\",\""+ uuid+"\",\""+photoID+"\"]")
+			}
+
 			//err = client.Call("Query.InitAvatar", args, &reply)
 			log.Println("reply: " + reply)
 			byt := []byte(reply)
@@ -295,8 +331,13 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		nickname := strings.Join(r.Form["nname"],"")
 		log.Println("nn " + nickname)
 		if len(nickname) > 0 {
-			args := util.Args2{ uuid, nickname}
-			client.(*rpc.Client).Call("Query.ChangeNickname", args, &reply)
+			if commType == "rpc" {
+				args := util.Args2{ uuid, nickname}
+				client.(*rpc.Client).Call("Query.ChangeNickname", args, &reply)
+			}
+			if commType == "tcp" {
+				reply = tcpClient("[\"ChangeNickname\",\""+ uuid+"\",\""+ nickname+"\"]")
+			}
 			_ = reply
 		}
 		log.Println("editHandler consumed：", time.Now().Sub(startTime))
@@ -318,9 +359,14 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uuid := session.Values["uuid"].(string)
-	var reply string	
-	args := util.Args2{uuid,""}
-	client.(*rpc.Client).Call("Query.Lookup", args, &reply)
+	var reply string
+	if commType == "rpc" {
+		args := util.Args2{uuid,""}
+		client.(*rpc.Client).Call("Query.Lookup", args, &reply)
+	}
+	if commType == "tcp" {
+		reply = tcpClient("[\"Lookup\",\""+ uuid+"\",\"\"]")
+	}
 	log.Println("lookup: " + reply)
 	byt := []byte(reply)
 	var dat map[string]interface{}
@@ -360,9 +406,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		username := strings.Join(r.Form["username"],"")
 		pwd := strings.Join(r.Form["password"],"")
 
-		args := util.Args2{username,pwd}
 		var reply string
-		client.(*rpc.Client).Call("Query.SignIn", args, &reply)
+		if commType == "rpc" {
+			args := util.Args2{username,pwd}
+			client.(*rpc.Client).Call("Query.SignIn", args, &reply)
+		}
+		if commType == "tcp" {
+			reply = tcpClient("[\"SignIn\",\""+ username+"\",\""+pwd+"\"]")
+		}
 		//err = client.Call("Query.SignIn", args, &reply)
 		log.Printf("response:%s\n",  reply)
 		byt := []byte(reply)
@@ -387,8 +438,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
   }
 }
 
-var conf = make(map[string]interface{})
-
 func init(){
 	dir, err := os.Getwd()
 	if err != nil {
@@ -403,12 +452,25 @@ func init(){
 	}
 	defer f.Close()
 	log.SetOutput(f)
+
 	commType = conf["proto"].(string)
+	log.Println("proto type : " , commType)
+
+	tcp_server_addr = conf["tcp_server_host"].(string) + ":" + conf["tcp_server_port"].(string)
+	log.Println("tcp server addr : " , tcp_server_addr)
+	/*
 	if commType == "tcp" {
+		tcpConn, err = net.Dial("tcp", tcp_server_addr)
+		if err != nil{
+			log.Println(err)
+		}
 	}
+	*/
 	if commType == "rpc" {
-		client, err = rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-		//defer client.(*rpc.Client).Close()
+		client, err = rpc.Dial("tcp", tcp_server_addr)
+		if err != nil{
+			log.Println(err)
+		}
 	}
 	if client == nil {
 		log.Println("client nil")
@@ -435,6 +497,7 @@ func main() {
 	}
 
 	if commType == "tcp" {
+		//defer client.(net.Conn).Close()
 	}
 
 	http.HandleFunc("/signup", signup)
@@ -444,9 +507,9 @@ func main() {
 	http.HandleFunc("/home", homeHandler)
 	http.HandleFunc("/edit", editHandler)
 
-	web_host := conf["web_server_host"].(string)
+	//web_host := conf["web_server_host"].(string)
 	web_port := conf["web_server_port"].(string)
-	addr := web_host+":"+web_port
+	addr := ":"+web_port
 	log.Println("listening to addr  " +  addr)
 	err = http.ListenAndServe(string(addr), nil) // setting listening port
 	if err != nil {
