@@ -14,6 +14,8 @@ import (
 	"util"
     )
 
+var conf = make(map[string]interface{})
+
 type mysqlCli struct{
 	db *sql.DB
 }
@@ -22,17 +24,33 @@ type mysqlCli struct{
 var mCli *mysqlCli
 
 func init(){
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir := conf["log_file_dir"].(string)
+	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+
 	mCli = &mysqlCli{db:nil}
+
+
 }
 
 func (my *mysqlCli ) Connect() {
 	if  my.db == nil{
 		var err error
 		dbDriver := "mysql"
-		dbUser := "root"
-		dbPass := "HappyAlejandroSeaah999"
-		dbName := "UserDB"
-		dbAddr := "198.13.43.63:3306"
+		dbUser := conf["db_user"].(string)
+		dbPass := conf["db_pass"].(string)
+		dbName := conf["db_name"].(string)
+		dbAddr := conf["mysql_host"].(string) + ":" + conf["mysql_port"].(string) 
 		my.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
 		if err != nil {
 			log.Println(err.Error())
@@ -89,18 +107,11 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 
 	uuid := uuID()
 	hashedPwd :=string(hash(pwd))
-	/*
-	db, err :=Connect()
-	stmt, err := db.Prepare("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?")
-	es, err := stmt.Exec(uuid, realname,nickname,hashedPwd)
-	_ = es
-	log.Println(err)
-	*/
+	mCli.Inquery("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?",uuid, realname,nickname,hashedPwd)
 	if mCli.db == nil{
 		log.Println("mysql client is nil")
 	}
 
-	mCli.Inquery("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?",uuid, realname,nickname,hashedPwd)
 	util.RedisPut("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
 	util.RedisPut("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
 	return login(realname ,pwd)
@@ -229,9 +240,8 @@ func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
 	return nil
 }
 
-var conf = make(map[string]interface{})
-
 func main() {
+	/*
 	dir, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -245,7 +255,7 @@ func main() {
 	}
 	defer f.Close()
 	log.SetOutput(f)
-
+*/
     teller := new(Query)
     rpc.Register(teller)
 
@@ -254,7 +264,7 @@ func main() {
 	tcp_addr := tcp_host + ":" + tcp_port
     tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
     listener, err := net.ListenTCP("tcp", tcpAddr)
-
+	_ = err
     for {
         conn, err := listener.Accept()
         if err != nil {
