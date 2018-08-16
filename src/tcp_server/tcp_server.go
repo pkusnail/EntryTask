@@ -13,8 +13,11 @@ import (
 	"net/rpc"
 	"util"
 	"time"
+	"runtime"
 	"github.com/garyburd/redigo/redis"
 )
+
+var commType = "tcp" //default tcp, can be rpc
 
 var conf = make(map[string]interface{})
 
@@ -305,6 +308,8 @@ func init(){
 	REDIS_PORT := conf["redis_port"].(string)
 	REDIS_ADDR = REDIS_HOST + ":" + REDIS_PORT
 	log.Println("redis addr : " + REDIS_ADDR)
+	commType = conf["proto"].(string)
+	log.Println("communication type  : " + commType)
 }
 
 func main() {
@@ -319,20 +324,29 @@ func main() {
 	defer globalLogFile.Close()
 	log.SetOutput(globalLogFile)
 
-	teller := new(Query)
-	rpc.Register(teller)
-
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	tcp_host := conf["tcp_server_host"].(string)
 	tcp_port := conf["tcp_server_port"].(string)
 	tcp_addr := tcp_host + ":" + tcp_port
-	tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	_ = err
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			continue
+
+	if commType == "rpc" {
+		teller := new(Query)
+		rpc.Register(teller)
+		tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
+		listener, err := net.ListenTCP("tcp", tcpAddr)
+		_ = err
+		for {
+			conn, err := listener.Accept()
+			if err != nil {
+				continue
+			}
+			rpc.ServeConn(conn)
 		}
-		rpc.ServeConn(conn)
+	}
+
+	if commType == "tcp" {
+
 	}
 }
+
+

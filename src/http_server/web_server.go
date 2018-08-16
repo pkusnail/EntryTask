@@ -27,7 +27,11 @@ const (
 	CONN_TYPE = "tcp"
 )
 
-type Register struct {
+var commType = "tcp" // default tcp , can be rpc
+
+var client interface{} //*rpc.Client //, _ = rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+
+type Register struct{ 
 	realname string
 	nickname string
 	info string
@@ -83,19 +87,9 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		nickname := strings.Join(r.Form["nname"],"")
 		pwd := strings.Join(r.Form["pwd"],"")
 		//communicate with tcp server and proxy server  
-		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-		if err != nil {
-			log.Println(err)
-			log.Fatal("dialing:", err)
-		}
 		args := util.Args4{realname,nickname,pwd,""}
 		var reply string
-		err = client.Call("Query.SignUp", args, &reply)
-		client.Close()
-		if err != nil {
-			log.Println(err)
-			log.Fatal("Query.SignUp error:", err)
-		}
+		client.(*rpc.Client).Call("Query.SignUp", args, &reply)
 		log.Println("check : ",reply)	
 		byt := []byte(reply)
 		var dat map[string]interface{}
@@ -247,17 +241,10 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("saved")
 			//update db	
 			var reply string
-			client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-			if err != nil {
-				log.Println(err)
-			}
 
 			args := util.Args2{ uuid, photoID}
-			err = client.Call("Query.InitAvatar", args, &reply)
-			client.Close()
-			if err != nil {
-				log.Fatal(err)
-			}
+			client.(*rpc.Client).Call("Query.InitAvatar", args, &reply)
+			//err = client.Call("Query.InitAvatar", args, &reply)
 			log.Println("reply: " + reply)
 			byt := []byte(reply)
 			var dat map[string]interface{}
@@ -308,11 +295,8 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		nickname := strings.Join(r.Form["nname"],"")
 		log.Println("nn " + nickname)
 		if len(nickname) > 0 {
-			client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-			_ = err
 			args := util.Args2{ uuid, nickname}
-			err = client.Call("Query.ChangeNickname", args, &reply)
-			client.Close()
+			client.(*rpc.Client).Call("Query.ChangeNickname", args, &reply)
 			_ = reply
 		}
 		log.Println("editHandler consumed：", time.Now().Sub(startTime))
@@ -334,13 +318,10 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uuid := session.Values["uuid"].(string)
-	var reply string
-	log.Println("uuid in sess :" + uuid )
-	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+	var reply string	
 	args := util.Args2{uuid,""}
-	err = client.Call("Query.Lookup", args, &reply)
+	client.(*rpc.Client).Call("Query.Lookup", args, &reply)
 	log.Println("lookup: " + reply)
-	client.Close()
 	byt := []byte(reply)
 	var dat map[string]interface{}
 	json.Unmarshal(byt, &dat)
@@ -349,7 +330,6 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	nickname := dat["nickname"].(string)
 	//avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
 	avatar_url := conf["image_fetch_prefix"].(string) + "/"+ pid +"?w=600&h=600"
-	_ = err
 	_ = code
 	data := HomeInfo{
 		AvatarUrl :  avatar_url,
@@ -380,18 +360,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		username := strings.Join(r.Form["username"],"")
 		pwd := strings.Join(r.Form["password"],"")
 
-		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-		if err != nil {
-			log.Fatal("dialing:", err)
-		}
 		args := util.Args2{username,pwd}
 		var reply string
-		err = client.Call("Query.SignIn", args, &reply)
-		client.Close()
-
-		if err != nil {
-			log.Fatal("error:", err)
-		}
+		client.(*rpc.Client).Call("Query.SignIn", args, &reply)
+		//err = client.Call("Query.SignIn", args, &reply)
 		log.Printf("response:%s\n",  reply)
 		byt := []byte(reply)
 		var dat map[string]interface{}
@@ -417,6 +389,32 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 var conf = make(map[string]interface{})
 
+func init(){
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir := conf["log_file_dir"].(string)
+
+	f, err := os.OpenFile( dir + "/" + logDir + "/web_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: ", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+	commType = conf["proto"].(string)
+	if commType == "tcp" {
+	}
+	if commType == "rpc" {
+		client, err = rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+		//defer client.(*rpc.Client).Close()
+	}
+	if client == nil {
+		log.Println("client nil")
+	}
+}
+
 func main() {
 	dir, err := os.Getwd()
 	if err != nil {
@@ -431,6 +429,13 @@ func main() {
 	}
 	defer f.Close()
 	log.SetOutput(f)
+
+	if commType == "rpc" {
+		defer client.(*rpc.Client).Close()
+	}
+
+	if commType == "tcp" {
+	}
 
 	http.HandleFunc("/signup", signup)
 	http.HandleFunc("/upload", uploadHandler)
