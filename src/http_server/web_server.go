@@ -95,7 +95,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 			log.Println(err)
 			log.Fatal("Query.SignUp error:", err)
 		}
-		log.Println("check : %v",reply)	
+		log.Println("check : ",reply)	
 		byt := []byte(reply)
 		var dat map[string]interface{}
 		if err := json.Unmarshal(byt, &dat); err != nil {
@@ -392,7 +392,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			log.Println("failed to login")
 			http.Redirect(w,r,"/login", 302)
 		}
-		log.Println("check login uuid: %s",uuid)
+		log.Println("check login uuid: ",uuid)
 		//communicate with tcp server and proxy server
 		session.Values["authenticated"] = true
 		session.Values["uuid"] = uuid

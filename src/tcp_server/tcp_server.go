@@ -12,6 +12,8 @@ import (
 	"net"
 	"net/rpc"
 	"util"
+	"time"
+    "github.com/garyburd/redigo/redis"
     )
 
 var conf = make(map[string]interface{})
@@ -21,22 +23,6 @@ type mysqlCli struct{
 }
 
 var mCli *mysqlCli
-
-func init(){
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
-	}
-	conf = util.ConfReader(dir + "/../../conf/setting.conf")
-	logDir := conf["log_file_dir"].(string)
-	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	defer f.Close()
-	log.SetOutput(f)
-	mCli = &mysqlCli{db:nil}
-}
 
 func (my *mysqlCli ) Connect() {
 	if  my.db == nil{
@@ -79,6 +65,81 @@ func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
 	}
 }
 
+
+var REDIS_MAX_CONN = 20
+var REDIS_ADDR = "127.0.0.1:6379" //default value
+var redisPoll chan redis.Conn
+
+func putRedis(conn redis.Conn) {
+    if redisPoll == nil {
+        redisPoll = make(chan redis.Conn, REDIS_MAX_CONN)
+    }
+    if len(redisPoll) >= REDIS_MAX_CONN {
+        conn.Close()
+        return
+    }
+    redisPoll <- conn
+}
+
+func InitRedis(network, address string) redis.Conn {
+    if len(redisPoll) == 0 {
+        redisPoll = make(chan redis.Conn, REDIS_MAX_CONN)
+        go func() {
+            for i := 0; i < REDIS_MAX_CONN; i++ {
+                c, err := redis.Dial(network, address)
+                if err != nil {
+                    panic(err)
+                }
+                putRedis(c)
+            }
+        } ()
+    }
+    return <-redisPoll
+}
+
+func redisSet(key string, val string)  {
+    startTime := time.Now()
+    c := InitRedis("tcp", REDIS_ADDR)
+	c.Do("SET", key, val)
+    log.Println("redisSet consumed：%s", time.Now().Sub(startTime));
+}
+
+func redisGet(key string) string  {
+    startTime := time.Now()
+    c := InitRedis("tcp", REDIS_ADDR)
+	val, _ := redis.String(c.Do("GET", key))
+    log.Println("redisGet consumed：%s", time.Now().Sub(startTime));
+	return val
+}
+
+
+
+func init(){
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir := conf["log_file_dir"].(string)
+	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: %v", err)
+	}
+	defer f.Close()
+	log.SetOutput(f)
+	mCli = &mysqlCli{db:nil}
+
+	REDIS_MAX_CONN, err = strconv.Atoi(conf["redis_max_conn"].(string))
+	if err != nil{
+		log.Println(err)
+	}
+	REDIS_HOST := conf["redis_host"].(string)
+	REDIS_PORT := conf["redis_port"].(string)
+	REDIS_ADDR = REDIS_HOST + ":" + REDIS_PORT
+	log.Println("redis addr : " + REDIS_ADDR)
+}
+
+
 func uuID() string {
     out, err := exec.Command("uuidgen").Output()
     if err != nil {
@@ -95,7 +156,7 @@ func hash(s string) string {
 
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
 	//redis format :  username:realname
-	resp := util.RedisGet( "user:" + realname)
+	resp := redisGet( "user:" + realname)
 	if resp != "" {
 		log.Println(realname +" already exists!")
 		return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\",\"uuid\":\"\"}"
@@ -108,14 +169,14 @@ func insertUser( realname string, nickname string, pwd string, avatar string) st
 		log.Println("mysql client is nil")
 	}
 
-	util.RedisPut("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
-	util.RedisPut("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
+	redisSet("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
+	redisSet("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
 	return login(realname ,pwd)
 }
 
 func login(realname string, pwd string) string {
 	hashedPwd :=string(hash(pwd))
-	resp := util.RedisGet("user:"+realname)
+	resp := redisGet("user:"+realname)
 	if resp == "" {
 		return "{\"code\":1,\"msg\":\"fail\",\"uuid\":\"\"}"
 	}
@@ -133,11 +194,11 @@ func login(realname string, pwd string) string {
 
 func lookup(uuid string) string {
 	// lookup the redis cache first
-	photoID := util.RedisGet("uuid_pid:"+uuid)
+	photoID := redisGet("uuid_pid:"+uuid)
 	if photoID ==""{
 		return "{\"code\":2,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
-	resp := util.RedisGet("uuid:"+uuid)
+	resp := redisGet("uuid:"+uuid)
 	if resp == "" {
 		return "{\"code\":3,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
@@ -146,7 +207,7 @@ func lookup(uuid string) string {
 }
 
 func lookupAvatar(uuid string) string {
-    resp := util.RedisGet("uuid_pid:" +uuid)
+    resp := redisGet("uuid_pid:" +uuid)
 	log.Println("lookup avatar : " + resp)
 	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
 	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + resp + "\"}"
@@ -154,16 +215,16 @@ func lookupAvatar(uuid string) string {
 
 func updateNickname( uuid string, nickname string) string {
 	mCli.Inquery("update user set nickname=? where uuid=?",nickname, uuid)
-	uuid_pid_nn_rn := util.RedisGet("uuid:"+uuid)
+	uuid_pid_nn_rn := redisGet("uuid:"+uuid)
 	log.Println(uuid_pid_nn_rn)
 	upnr := strings.Split(uuid_pid_nn_rn,"_")
-	util.RedisPut("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
+	redisSet("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
 	log.Println(upnr[0])
 	log.Println(upnr[1])
 	log.Println(upnr[2])
 	log.Println(upnr[3])
 
-	uuid_pwd_nn := util.RedisGet("uuid:" + upnr[3])
+	uuid_pwd_nn := redisGet("uuid:" + upnr[3])
 	upn := strings.Split(uuid_pwd_nn,"_")
 	log.Println("upn: " + uuid_pwd_nn)
 	_=upn
@@ -174,7 +235,7 @@ func insertAvatar( uuid string, pid string) string {
 	sql := "insert into  avatar (uuid,pid)  values (?,?)"
 	affect := mCli.Inquery(sql, uuid, pid)
 	if affect  {
-		util.RedisPut("uuid_pid:"+uuid,pid)
+		redisSet("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
 	} else {
 		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";

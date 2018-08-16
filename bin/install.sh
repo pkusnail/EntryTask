@@ -17,6 +17,7 @@ go get -u github.com/gorilla/mux
 go get golang.org/x/crypto/bcrypt
 go get github.com/gorilla/sessions
 go get github.com/google/uuid
+go get github.com/garyburd/redigo/redis
 
 #build 
 cd ../pkg
