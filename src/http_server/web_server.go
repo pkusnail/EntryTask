@@ -84,7 +84,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		//communicate with tcp server and proxy server  
 		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			log.Fatal("dialing:", err)
 		}
 		args := util.Args4{realname,nickname,pwd,""}
@@ -92,7 +92,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		err = client.Call("Query.SignUp", args, &reply)
 		client.Close()
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			log.Fatal("Query.SignUp error:", err)
 		}
 		log.Println("check : %v",reply)	
@@ -176,7 +176,6 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
 			resp.Body.Close()
 			strs := strings.Split(body.String() ,"http://yourhostname:4869/")
 			strs1 := strings.Split(strs[1],"</a>")
-			fmt.Println(strs1[0])
 			return strs1[0]  //photoID
     }
 }
@@ -212,7 +211,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		r.ParseMultipartForm(32 << 20)
 		file, handler, err := r.FormFile("uploadfile")
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		defer file.Close()
@@ -241,7 +240,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			var reply string
 			client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 
 			args := util.Args2{ uuid, photoID}
@@ -352,59 +351,55 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	session, _ := store.Get(r, "cookie-name")
 	// Check if user is authenticated
 	if auth, ok := session.Values["authenticated"].(bool); auth {
-		fmt.Println("Already logged in ")
+		log.Println("Already logged in ")
 		_ = ok
 		http.Redirect(w, r, "/home", 302) // redirect to home page
 	}
 
-	fmt.Println("method:", r.Method) //get request method
 	if r.Method == "GET" {
-	t, _ := template.ParseFiles("tpl/login.gtpl")
-	t.Execute(w, nil)
+		t, _ := template.ParseFiles("tpl/login.gtpl")
+		t.Execute(w, nil)
 	} else {
-	r.ParseForm()
-	// logic part of log in
-	username := strings.Join(r.Form["username"],"")
-	pwd := strings.Join(r.Form["password"],"")
+		r.ParseForm()
+		// logic part of log in
+		username := strings.Join(r.Form["username"],"")
+		pwd := strings.Join(r.Form["password"],"")
 
-	fmt.Println("username:", username)
-	fmt.Println("password:", pwd)
+		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
+		if err != nil {
+			log.Fatal("dialing:", err)
+		}
+		args := util.Args2{username,pwd}
+		var reply string
+		err = client.Call("Query.SignIn", args, &reply)
+		client.Close()
 
-
-	client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
-	if err != nil {
-		log.Fatal("dialing:", err)
-	}
-	args := util.Args2{username,pwd}
-	var reply string
-	err = client.Call("Query.SignIn", args, &reply)
-	client.Close()
-
-	if err != nil {
-		log.Fatal("error:", err)
-	}
-	log.Printf("response:%s\n",  reply)
-	byt := []byte(reply)
-	var dat map[string]interface{}
-	if err := json.Unmarshal(byt, &dat); err != nil {
-		panic(err)
-	}
-	code := dat["code"].(float64)
-	uuid := dat["uuid"].(string)
-	log.Println(code)
-	if code != 0 {
-		fmt.Println("failed to login")
-		http.Redirect(w,r,"/login", 302)
-	}
-	log.Println("check login uuid: %s",uuid)
-	//communicate with tcp server and proxy server
-	session.Values["authenticated"] = true
-	session.Values["uuid"] = uuid
-	session.Save(r, w)
-	http.Redirect(w, r, "/home", 302)
+		if err != nil {
+			log.Fatal("error:", err)
+		}
+		log.Printf("response:%s\n",  reply)
+		byt := []byte(reply)
+		var dat map[string]interface{}
+		if err := json.Unmarshal(byt, &dat); err != nil {
+			panic(err)
+		}
+		code := dat["code"].(float64)
+		uuid := dat["uuid"].(string)
+		log.Println(code)
+		if code != 0 {
+			log.Println("failed to login")
+			http.Redirect(w,r,"/login", 302)
+		}
+		log.Println("check login uuid: %s",uuid)
+		//communicate with tcp server and proxy server
+		session.Values["authenticated"] = true
+		session.Values["uuid"] = uuid
+		session.Save(r, w)
+		http.Redirect(w, r, "/home", 302)
   }
 }
 
+var conf = make(map[string]interface{})
 
 func main() {
 	dir, err := os.Getwd()
@@ -412,9 +407,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	f, err := os.OpenFile( dir + "/../../log/web_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir := conf["log_file_dir"].(string)
+	web_host := conf["web_server_host"].(string)
+	web_port := conf["web_server_port"].(string)
+
+	f, err := os.OpenFile( dir + "/" + logDir + "/web_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatalf("error opening file: %v", err)
+		log.Fatalf("error opening file: ", err)
 	}
 	defer f.Close()
 
@@ -427,8 +427,9 @@ func main() {
 	http.HandleFunc("/home", homeHandler)
 	http.HandleFunc("/edit", editHandler)
 
-
-	err = http.ListenAndServe(":9090", nil) // setting listening port
+	addr := web_host+":"+web_port
+	log.Println("listening to addr  " +  addr)
+	err = http.ListenAndServe(string(addr), nil) // setting listening port
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}

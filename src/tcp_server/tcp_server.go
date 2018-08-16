@@ -235,6 +235,9 @@ func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
 	return nil
 }
 
+
+var conf = make(map[string]interface{})
+
 func main() {
 
 	dir, err := os.Getwd()
@@ -242,7 +245,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	f, err := os.OpenFile( dir + "/../../log/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir := conf["log_file_dir"].(string)
+	tcp_host := conf["tcp_server_host"].(string)
+	tcp_port := conf["tcp_server_port"].(string)
+
+	tcp_addr := tcp_host + ":" + tcp_port
+	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {
 		log.Fatalf("error opening file: %v", err)
 	}
@@ -254,7 +264,8 @@ func main() {
     teller := new(Query)
     rpc.Register(teller)
 
-    tcpAddr, err := net.ResolveTCPAddr("tcp", ":9999")
+
+    tcpAddr, err := net.ResolveTCPAddr("tcp", tcp_addr)
     checkErr(err)
 
     listener, err := net.ListenTCP("tcp", tcpAddr)
