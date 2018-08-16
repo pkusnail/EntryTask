@@ -14,4 +14,12 @@ type Args4 struct {
 	A,B,C,D string
 }
 
+type Resp struct {
+	code int
+	msg	string
+	data [] string
+}
+
+
+
 

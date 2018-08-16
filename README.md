@@ -15,8 +15,8 @@ http://alejandroseaah.com:9090/edit
 http://alejandroseaah.com:9090/logout
 
 # How to run
-> cd bin
-> sh install.sh
+> cd bin\
+> sh install.sh\
 > sh run.sh
 
 
