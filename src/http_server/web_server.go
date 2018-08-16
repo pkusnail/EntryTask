@@ -80,18 +80,14 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		// logic part of signup
 		realname := strings.Join(r.Form["rname"],"")
 		nickname := strings.Join(r.Form["nname"],"")
-		pwd1 := strings.Join(r.Form["pwd1"],"")
-		pwd2 := strings.Join(r.Form["pwd2"],"")
-		if pwd1 != pwd2 {
-			http.Redirect(w, r, "/signup", 301)
-		}
+		pwd := strings.Join(r.Form["pwd"],"")
 		//communicate with tcp server and proxy server  
 		client, err := rpc.Dial(CONN_TYPE, CONN_HOST+":"+CONN_PORT)
 		if err != nil {
 			fmt.Println(err)
 			log.Fatal("dialing:", err)
 		}
-		args := util.Args4{realname,nickname,pwd1,""}
+		args := util.Args4{realname,nickname,pwd,""}
 		var reply string
 		err = client.Call("Query.SignUp", args, &reply)
 		client.Close()
@@ -184,23 +180,6 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
 			return strs1[0]  //photoID
     }
 }
-
-
-/*
-func editHandler(w http.ResponseWriter, r *http.Request) {
-	session, _ := store.Get(r, "cookie-name")
-	// Check if user is authenticated
-	if auth, ok := session.Values["authenticated"].(bool); !auth {
-		log.Println("Should login in first ")
-		_ = ok
-		http.Redirect(w, r, "/login", 302) // redirect to home page
-	}
-	uuid := session.Values["uuid"].(string)
-
-	t, _ := template.ParseFiles("tpl/edit.gtpl")
-	t.Execute(w, nil)
-}
-*/
 
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
