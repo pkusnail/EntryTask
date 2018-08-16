@@ -50,6 +50,7 @@ func  getMillSec() int64{ // return timestamp
 }
 
 func signup(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	if r.Method == "GET" {
 		var rname, nname, info  []string
 		var ok bool
@@ -117,14 +118,15 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		session.Values["authenticated"] = true
 		session.Values["uuid"] = uuid
 		session.Save(r, w)
-		log.Println("sess saved")
+		log.Println("signupHandler consumed：", time.Now().Sub(startTime))
 		http.Redirect(w, r, "/upload", 302)	
 	}
 }
 
 
 func newfileUploadRequest(uri string, params map[string]string, paramName, path string) (*http.Request, error) {
-        file, err := os.Open(path)
+	startTime := time.Now()
+	file, err := os.Open(path)
         if err != nil {
                 return nil, err
         }
@@ -148,11 +150,13 @@ func newfileUploadRequest(uri string, params map[string]string, paramName, path 
 
         req, err := http.NewRequest("POST", uri, body)
         req.Header.Set("Content-Type", writer.FormDataContentType())
+    	log.Println("newfileUploadRequest consumed：", time.Now().Sub(startTime))
         return req, err
 }
 
 func upload_help ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
-        extraParams := map[string]string{
+	startTime := time.Now()
+	extraParams := map[string]string{
                 "title":       "My Document",
                 "author":      "Matt Aimonetti",
                 "description": "A document with all the Go programming language secrets",
@@ -177,20 +181,24 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
 			resp.Body.Close()
 			strs := strings.Split(body.String() ,"http://yourhostname:4869/")
 			strs1 := strings.Split(strs[1],"</a>")
+			log.Println("upload_help consumed：", time.Now().Sub(startTime))
 			return strs1[0]  //photoID
     }
 }
 
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	session, _ := store.Get(r, "cookie-name")
 	session.Values["authenticated"] = false
 	session.Values["uuid"] = ""
 	session.Save(r,w)
+	log.Println("logoutHandler consumed：", time.Now().Sub(startTime))
 	http.Redirect(w,r,"/login",302)
 }
 
 func uploadHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	session, _ := store.Get(r, "cookie-name")
 	//check auth
 	if auth, ok := session.Values["authenticated"].(bool); !auth {
@@ -266,6 +274,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			//update redis
 
 			os.Remove(localFile)
+			log.Println("uploadHandler consumed：", time.Now().Sub(startTime))
 			http.Redirect(w, r, "/home", 302)
 		}else{//
 			http.Redirect(w, r, "/upload", 302)
@@ -275,6 +284,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func editHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	session, _ := store.Get(r, "cookie-name")
 	//check auth
 	if auth, ok := session.Values["authenticated"].(bool); !auth {
@@ -305,7 +315,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 			client.Close()
 			_ = reply
 		}
-		
+		log.Println("editHandler consumed：", time.Now().Sub(startTime))
 		http.Redirect(w, r, "/home", 302)
 	}
 }
@@ -314,6 +324,7 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	session, _ := store.Get(r, "cookie-name")
 	// Check if user is authenticated
 	if auth, ok := session.Values["authenticated"].(bool); !auth {
@@ -347,9 +358,11 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 
 	t := template.Must(template.ParseFiles("tpl/home.html"))
 	t.Execute(w, data)
+	log.Println("homeHandler consumed：", time.Now().Sub(startTime))
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	startTime := time.Now()
 	session, _ := store.Get(r, "cookie-name")
 	// Check if user is authenticated
 	if auth, ok := session.Values["authenticated"].(bool); auth {
@@ -397,6 +410,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		session.Values["authenticated"] = true
 		session.Values["uuid"] = uuid
 		session.Save(r, w)
+		log.Println("loginHandler consumed：", time.Now().Sub(startTime))
 		http.Redirect(w, r, "/home", 302)
   }
 }
