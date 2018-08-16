@@ -6,7 +6,7 @@ DROP TABLE IF EXISTS `user`;
 CREATE TABLE `user` (
   `id` bigint(64) unsigned NOT NULL AUTO_INCREMENT,
   `uuid` varchar(64) NOT NULL,
-  `realname` varchar(1024) DEFAULT NULL,
+  `realname` varchar(1024) DEFAULT NULL UNIQUE,
   `nickname` varchar(1024) DEFAULT NULL,
   `pwd` varchar(32) DEFAULT NULL,
   `role` tinyint(1) NOT NULL DEFAULT '0' COMMENT '0 normal user , 1 manager',
