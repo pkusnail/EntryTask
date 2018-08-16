@@ -408,11 +408,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	conf = util.ConfReader(dir + "/../../conf/setting.conf")
 	logDir := conf["log_file_dir"].(string)
-	web_host := conf["web_server_host"].(string)
-	web_port := conf["web_server_port"].(string)
 
 	f, err := os.OpenFile( dir + "/" + logDir + "/web_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
 	if err != nil {
@@ -428,6 +425,8 @@ func main() {
 	http.HandleFunc("/home", homeHandler)
 	http.HandleFunc("/edit", editHandler)
 
+	web_host := conf["web_server_host"].(string)
+	web_port := conf["web_server_port"].(string)
 	addr := web_host+":"+web_port
 	log.Println("listening to addr  " +  addr)
 	err = http.ListenAndServe(string(addr), nil) // setting listening port

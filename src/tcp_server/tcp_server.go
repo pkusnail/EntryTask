@@ -20,7 +20,6 @@ type mysqlCli struct{
 	db *sql.DB
 }
 
-//var mCli *mysqlCli = nil
 var mCli *mysqlCli
 
 func init(){
@@ -28,7 +27,6 @@ func init(){
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	conf = util.ConfReader(dir + "/../../conf/setting.conf")
 	logDir := conf["log_file_dir"].(string)
 	f, err := os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
@@ -37,10 +35,7 @@ func init(){
 	}
 	defer f.Close()
 	log.SetOutput(f)
-
 	mCli = &mysqlCli{db:nil}
-
-
 }
 
 func (my *mysqlCli ) Connect() {
@@ -83,6 +78,7 @@ func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
 		return false
 	}
 }
+
 func uuID() string {
     out, err := exec.Command("uuidgen").Output()
     if err != nil {
@@ -135,7 +131,6 @@ func login(realname string, pwd string) string {
 	return "{\"code\":0,\"msg\":\"success\",\"uuid\":\"" + uuid_pwd_nickname[0] + "\"}"
 }
 
-
 func lookup(uuid string) string {
 	// lookup the redis cache first
 	photoID := util.RedisGet("uuid_pid:"+uuid)
@@ -150,7 +145,6 @@ func lookup(uuid string) string {
 	return "{\"code\":0,\"msg\":\"success\",\"nickname\":\"" + id_pwd_pid_nn_rn[2] +"\",\"photoid\":\"" + photoID + "\"}"
 }
 
-
 func lookupAvatar(uuid string) string {
     resp := util.RedisGet("uuid_pid:" +uuid)
 	log.Println("lookup avatar : " + resp)
@@ -160,11 +154,8 @@ func lookupAvatar(uuid string) string {
 
 func updateNickname( uuid string, nickname string) string {
 	mCli.Inquery("update user set nickname=? where uuid=?",nickname, uuid)
-	// update redis cache
-
 	uuid_pid_nn_rn := util.RedisGet("uuid:"+uuid)
 	log.Println(uuid_pid_nn_rn)
-
 	upnr := strings.Split(uuid_pid_nn_rn,"_")
 	util.RedisPut("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
 	log.Println(upnr[0])
@@ -175,7 +166,6 @@ func updateNickname( uuid string, nickname string) string {
 	uuid_pwd_nn := util.RedisGet("uuid:" + upnr[3])
 	upn := strings.Split(uuid_pwd_nn,"_")
 	log.Println("upn: " + uuid_pwd_nn)
-	//util.RedisPut("uuid:"+uuid, uuid +"_"+upn[1]+"_"+nickname)
 	_=upn
 	return "{\"code\":0,\"msg\":\"\"}";
 }
@@ -184,7 +174,6 @@ func insertAvatar( uuid string, pid string) string {
 	sql := "insert into  avatar (uuid,pid)  values (?,?)"
 	affect := mCli.Inquery(sql, uuid, pid)
 	if affect  {
-		// update redis cache
 		util.RedisPut("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
 	} else {
@@ -193,7 +182,6 @@ func insertAvatar( uuid string, pid string) string {
 }
 
 func updateAvatar( uuid string, pid string) string {
-
 	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
 	if affect {
 		//update redis cache	
