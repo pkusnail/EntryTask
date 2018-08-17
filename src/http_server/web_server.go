@@ -23,12 +23,6 @@ import (
 	"util"
 )
 
-const (
-	CONN_HOST = "localhost"
-	CONN_PORT = "9999"
-	CONN_TYPE = "tcp"
-)
-
 var commType = "tcp" // default tcp , can be rpc
 
 var conf = make(map[string]interface{})
