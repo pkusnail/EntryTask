@@ -27,6 +27,10 @@ var logDir string
 
 var globalLogFile *os.File
 
+var TCP_MAX_CONN = 10000
+
+var cq = make(chan net.Conn, TCP_MAX_CONN) // http client conn queue, default 10000
+
 type mysqlCli struct{
 	db *sql.DB
 }
@@ -313,51 +317,59 @@ func init(){
 	log.Println("redis addr : " + REDIS_ADDR)
 	commType = conf["proto"].(string)
 	log.Println("communication type  : " + commType)
+	
+	TCP_MAX_CONN, err = strconv.Atoi(conf["tcp_max_conn"].(string))
+	cq = make(chan net.Conn, TCP_MAX_CONN)
+	log.Println("max tcp conn number  : " , TCP_MAX_CONN)
+
 }
 
 
 
 // Handles incoming requests.
-func tcpRequestHandler(conn net.Conn) {
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 4096)
-	// Read the incoming connection into the buffer.
-	reqLen, err := conn.Read(buf)
-	_ = reqLen
-	if err != nil {
-		fmt.Println("Error reading:", err.Error())
-		conn.Close()
-		return
-	}
-	input := string(buf[:])
-	input = strings.Replace(input,"\x00","",-1)
-	log.Println("input: ", input)
-	reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
-	var paras []string
-	err = json.Unmarshal([]byte(input), &paras)
-	if err != nil {
-		log.Println(err)
+//func tcpRequestHandler(conn net.Conn) {
+func tcpRequestHandler() {
+	for conn := range cq {
+		// Make a buffer to hold incoming data.
+		buf := make([]byte, 4096)
+		// Read the incoming connection into the buffer.
+		reqLen, err := conn.Read(buf)
+		_ = reqLen
+		if err != nil {
+			fmt.Println("Error reading:", err.Error())
+			conn.Close()
+			return
+		}
+		input := string(buf[:])
+		input = strings.Replace(input,"\x00","",-1)
+		log.Println("input: ", input)
+		reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
+		var paras []string
+		err = json.Unmarshal([]byte(input), &paras)
+		if err != nil {
+			log.Println(err)
+			conn.Write([]byte(reply))
+			// Close the connection when you're done with it.
+			conn.Close()
+		}
+
+		switch paras[0] {
+			case "SignUp":
+				reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
+			case "InitAvatar":
+				reply = insertAvatar(paras[1], paras[2])+"\n"
+			case "ChangeNickname":
+				reply = updateNickname(paras[1], paras[2])+"\n"
+			case "Lookup":
+				reply = lookup(paras[1]) +"\n"
+			case "SignIn":
+				reply = login(paras[1], paras[2]) +"\n"
+		}
+		log.Println("server resp :", reply)
 		conn.Write([]byte(reply))
-		// Close the connection when you're done with it.
 		conn.Close()
-
 	}
-
-	switch paras[0] {
-		case "SignUp":
-			reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
-		case "InitAvatar":
-			reply = insertAvatar(paras[1], paras[2])+"\n"
-		case "ChangeNickname":
-			reply = updateNickname(paras[1], paras[2])+"\n"
-		case "Lookup":
-			reply = lookup(paras[1]) +"\n"
-		case "SignIn":
-			reply = login(paras[1], paras[2]) +"\n"
-	}
-	log.Println("server resp :", reply)
-	conn.Write([]byte(reply))
-	conn.Close()
+	//conn.Close()
 }
 
 func main() {
@@ -399,14 +411,22 @@ func main() {
 		}
 		defer l.Close()
 		log.Println("listening on ", tcp_port)
+		//go tcpRequestHandler()
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				log.Println("Error accepting: ", err.Error())
 				os.Exit(1)
 			}
+			if len(cq) < TCP_MAX_CONN {
+				cq <- conn
+			}else{
+				log.Println("Warning : tcp connection queue full !")
+				//should do something
+			}
 			// Handle connections in a new goroutine.
-			go tcpRequestHandler(conn)
+			//go tcpRequestHandler(conn)
+			go tcpRequestHandler()
 		}
 	}
 }

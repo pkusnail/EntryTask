@@ -472,9 +472,6 @@ func init(){
 			log.Println(err)
 		}
 	}
-	if client == nil {
-		log.Println("client nil")
-	}
 }
 
 func main() {

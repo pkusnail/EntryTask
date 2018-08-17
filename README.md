@@ -19,6 +19,55 @@ http://alejandroseaah.com:9090/logout
 > sh install.sh\
 > sh run.sh
 
+#Performance Tuning
+## TCP Server Side
+
+modify /etc/sysctl.conf as below :
+> fs.file-max = 20000000\
+> fs.nr_open = 20000000\
+> net.core.somaxconn = 10240\
+> net.ipv4.tcp_max_syn_backlog = 16384\
+> net.ipv4.tcp_syncookies = 0\
+> net.core.netdev_max_backlog = 41960\
+> net.ipv4.tcp_max_tw_buckets = 300000\
+> net.ipv4.tcp_tw_reuse = 1  \
+> net.ipv4.tcp_tw_recycle = 1\
+> net.ipv4.tcp_keepalive_intvl = 30\
+> net.ipv4.tcp_keepalive_time = 900\
+> net.ipv4.tcp_keepalive_probes = 3\
+> net.ipv4.tcp_fin_timeout = 15  \
+> net.ipv4.tcp_max_orphans = 131072\  
+> net.core.optmem_max = 819200\
+> net.core.rmem_default = 262144\  
+> net.core.wmem_default = 262144\ 
+> net.core.rmem_max = 16777216  \
+> net.core.wmem_max = 16777216\
+> net.ipv4.tcp_mem = 786432 4194304 8388608\
+> net.ipv4.tcp_rmem = 4096 4096 4206592\
+> net.ipv4.tcp_wmem = 4096 4096 4206592
+
+modify /etc/security/limits.conf as below:
+> root      soft    nofile          2000000\
+> root      hard    nofile          2000000
+
+exe the cmd below as a root user:
+> sysctl -p
+
+
+## Web Server Side
+
+change /etc/sysctl.conf as below :
+> fs.file-max = 100000\
+> fs.nr_open = 100000\
+> net.ipv4.tcp_tw_reuse = 1\
+> net.ipv4.tcp_tw_recycle = 1\
+> net.core.optmem_max = 8192\
+> net.ipv4.tcp_max_orphans = 10240\
+> net.ipv4.tcp_max_tw_buckets = 10240
+
+exe the cmd below as a root user:
+> sysctl -p
+
 
 
 # Requirements of the System
