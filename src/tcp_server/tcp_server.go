@@ -334,7 +334,7 @@ func tcpRequestHandler(conn net.Conn) {
 	log.Println("input: ", input)
 	reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
 	var paras []string
-	err = json.Unmarshal([]byte(input), &paras)	
+	err = json.Unmarshal([]byte(input), &paras)
 	if err != nil {
 		log.Println(err)
 		conn.Write([]byte(reply))
@@ -344,28 +344,21 @@ func tcpRequestHandler(conn net.Conn) {
 	}
 
 	switch paras[0] {
-	case "SignUp":
-		reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
-	case "InitAvatar":
-		reply = insertAvatar(paras[1], paras[2])+"\n"
-	case "ChangeNickname":
-		reply = updateNickname(paras[1], paras[2])+"\n"
-	case "Lookup":
-		reply = lookup(paras[1]) +"\n"
-	case "SignIn":
-		reply = login(paras[1], paras[2]) +"\n"
-	//default:
-	//	log.Println("parameter error : " + input)
+		case "SignUp":
+			reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
+		case "InitAvatar":
+			reply = insertAvatar(paras[1], paras[2])+"\n"
+		case "ChangeNickname":
+			reply = updateNickname(paras[1], paras[2])+"\n"
+		case "Lookup":
+			reply = lookup(paras[1]) +"\n"
+		case "SignIn":
+			reply = login(paras[1], paras[2]) +"\n"
 	}
 	log.Println("server resp :", reply)
-	// Send a response back to person contacting us
 	conn.Write([]byte(reply))
-	// Close the connection when you're done with it.
 	conn.Close()
 }
-
-
-
 
 func main() {
 	dir, err := os.Getwd()
