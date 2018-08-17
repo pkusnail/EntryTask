@@ -291,40 +291,46 @@ func (t *Query) ChangeNickname( args *util.Args2, reply *string) error{
 }
 
 
-
-
-func init(){
-	dir, err := os.Getwd()
-	if err != nil {
-		log.Fatal(err)
+func businessLogics(paras []string) string {
+	if paras == nil || len(paras) == 0 {
+		log.Println("Parameter error : nil or empty")
+		return ""
 	}
-	conf = util.ConfReader(dir + "/../../conf/setting.conf")
-	logDir = conf["log_file_dir"].(string)
-	globalLogFile, err = os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: ", err)
+	var reply string
+	switch paras[0] {
+		case "SignUp":
+			if len(paras) < 5 {
+				log.Println("Parameter error")
+				return ""
+			}
+			return insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
+		case "InitAvatar":
+			if len(paras) < 3 {
+				log.Println("Parameter error")
+				return ""
+			}
+			reply = insertAvatar(paras[1], paras[2])+"\n"
+		case "ChangeNickname":
+			if len(paras) < 3 {
+				log.Println("Parameter error")
+				return ""
+			}
+			reply = updateNickname(paras[1], paras[2])+"\n"
+		case "Lookup":
+			if len(paras) < 2 {
+				log.Println("Parameter error")
+				return ""
+			}
+			reply = lookup(paras[1]) +"\n"
+		case "SignIn":
+			if len(paras) < 3 {
+				log.Println("Parameter error")
+				return ""
+			}
+			reply = login(paras[1], paras[2]) +"\n"
 	}
-	defer globalLogFile.Close()
-	log.SetOutput(globalLogFile)
-	mCli = &mysqlCli{db:nil}
-
-	REDIS_MAX_CONN, err = strconv.Atoi(conf["redis_max_conn"].(string))
-	if err != nil{
-		log.Println(err)
-	}
-	REDIS_HOST := conf["redis_host"].(string)
-	REDIS_PORT := conf["redis_port"].(string)
-	REDIS_ADDR = REDIS_HOST + ":" + REDIS_PORT
-	log.Println("redis addr : " + REDIS_ADDR)
-	commType = conf["proto"].(string)
-	log.Println("communication type  : " + commType)
-	
-	TCP_MAX_CONN, err = strconv.Atoi(conf["tcp_max_conn"].(string))
-	cq = make(chan net.Conn, TCP_MAX_CONN)
-	log.Println("max tcp conn number  : " , TCP_MAX_CONN)
-
+	return reply
 }
-
 
 
 // Handles incoming requests.
@@ -352,24 +358,44 @@ func tcpRequestHandler() {
 			conn.Write([]byte(reply))
 			//conn.Close()
 		}
-
-		switch paras[0] {
-			case "SignUp":
-				reply = insertUser(paras[1], paras[2], paras[3], paras[4])+"\n"
-			case "InitAvatar":
-				reply = insertAvatar(paras[1], paras[2])+"\n"
-			case "ChangeNickname":
-				reply = updateNickname(paras[1], paras[2])+"\n"
-			case "Lookup":
-				reply = lookup(paras[1]) +"\n"
-			case "SignIn":
-				reply = login(paras[1], paras[2]) +"\n"
-		}
+		reply = businessLogics(paras)
 		log.Println("server resp :", reply)
 		resp,err:=util.Encode(reply)
 		conn.Write(resp)
 		//conn.Close()
 	}
+}
+
+
+func init(){
+	dir, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	conf = util.ConfReader(dir + "/../../conf/setting.conf")
+	logDir = conf["log_file_dir"].(string)
+	globalLogFile, err = os.OpenFile( dir + "/" + logDir + "/tcp_server.log", os.O_RDWR | os.O_CREATE | os.O_APPEND, 0666)
+	if err != nil {
+		log.Fatalf("error opening file: ", err)
+	}
+	defer globalLogFile.Close()
+	log.SetOutput(globalLogFile)
+	mCli = &mysqlCli{db:nil}
+
+	REDIS_MAX_CONN, err = strconv.Atoi(conf["redis_max_conn"].(string))
+	if err != nil{
+		log.Println(err)
+	}
+	REDIS_HOST := conf["redis_host"].(string)
+	REDIS_PORT := conf["redis_port"].(string)
+	REDIS_ADDR = REDIS_HOST + ":" + REDIS_PORT
+	log.Println("redis addr : " + REDIS_ADDR)
+	commType = conf["proto"].(string)
+	log.Println("communication type  : " + commType)
+	TCP_MAX_CONN, err = strconv.Atoi(conf["tcp_max_conn"].(string))
+	cq = make(chan net.Conn, TCP_MAX_CONN)
+	log.Println("max tcp conn number  : " , TCP_MAX_CONN)
+
 }
 
 func main() {
@@ -411,7 +437,6 @@ func main() {
 		}
 		defer l.Close()
 		log.Println("listening on ", tcp_port)
-		//go tcpRequestHandler()
 		for {
 			conn, err := l.Accept()
 			if err != nil {
@@ -424,8 +449,6 @@ func main() {
 				log.Println("Warning : tcp connection queue full !")
 				//should do something
 			}
-			// Handle connections in a new goroutine.
-			//go tcpRequestHandler(conn)
 			go tcpRequestHandler()
 		}
 	}

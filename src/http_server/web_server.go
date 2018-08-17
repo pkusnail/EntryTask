@@ -141,8 +141,8 @@ func signup(w http.ResponseWriter, r *http.Request) {
 
 
 func newfileUploadRequest(uri string, params map[string]string, paramName, path string) (*http.Request, error) {
-	startTime := time.Now()
-	file, err := os.Open(path)
+		startTime := time.Now()
+		file, err := os.Open(path)
         if err != nil {
                 return nil, err
         }
@@ -166,33 +166,33 @@ func newfileUploadRequest(uri string, params map[string]string, paramName, path 
 
         req, err := http.NewRequest("POST", uri, body)
         req.Header.Set("Content-Type", writer.FormDataContentType())
-    	log.Println("newfileUploadRequest consumed：", time.Now().Sub(startTime))
+		log.Println("newfileUploadRequest consumed：", time.Now().Sub(startTime))
         return req, err
 }
 
 func upload_help ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
-	startTime := time.Now()
-	extraParams := map[string]string{
-                "title":       "My Document",
-                "author":      "Matt Aimonetti",
-                "description": "A document with all the Go programming language secrets",
+		startTime := time.Now()
+		extraParams := map[string]string{
+                "title":       "pic title",
+                "author":      "author name",
+                "description": "Golang",
         }
         //request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
         request, err := newfileUploadRequest(conf["image_upload_url"].(string), extraParams, "file", photoRelativePath)
         if err != nil {
-            log.Fatal(err)
+            log.Println(err)
 			return "NULL"
         }
         client := &http.Client{}
         resp, err := client.Do(request)
         if err != nil {
-            log.Fatal(err)
+            log.Println(err)
 			return "NULL"
         } else {
 			body := &bytes.Buffer{}
 			_, err := body.ReadFrom(resp.Body)
 			if err != nil {
-				log.Fatal(err)
+				log.Println(err)
 			}
 			resp.Body.Close()
 			strs := strings.Split(body.String() ,"http://yourhostname:4869/")
@@ -223,7 +223,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/signup", 302)
 	}
 
-	uuid := session.Values["uuid"].(string)	
+	uuid := session.Values["uuid"].(string)
 	if r.Method == "GET" {
 		crutime := time.Now().Unix()
 		h := md5.New()
@@ -271,8 +271,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			if commType == "tcp" {
 				reply = tcpClient("[\"InitAvatar\",\""+ uuid+"\",\""+photoID+"\"]")
 			}
-
-			//err = client.Call("Query.InitAvatar", args, &reply)
 			log.Println("reply: " + reply)
 			byt := []byte(reply)
 			var dat map[string]interface{}
@@ -286,8 +284,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println("failed to upload db")
 				http.Redirect(w, r, "/upload", 302)
 			}
-			//update redis
-
 			os.Remove(localFile)
 			log.Println("uploadHandler consumed：", time.Now().Sub(startTime))
 			http.Redirect(w, r, "/home", 302)
@@ -336,9 +332,6 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/home", 302)
 	}
 }
-
-
-
 
 func homeHandler(w http.ResponseWriter, r *http.Request) {
 	startTime := time.Now()
@@ -429,6 +422,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/home", 302)
   }
 }
+
+
+
+
+
+
 
 func init(){
 	dir, err := os.Getwd()
