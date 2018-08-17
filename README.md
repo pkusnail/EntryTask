@@ -39,7 +39,7 @@ modify /etc/sysctl.conf as below :
 > net.ipv4.tcp_max_orphans = 131072\
 > net.core.optmem_max = 819200\
 > net.core.rmem_default = 262144\
-> net.core.wmem_default = 262144\ 
+> net.core.wmem_default = 262144\
 > net.core.rmem_max = 16777216\
 > net.core.wmem_max = 16777216\
 > net.ipv4.tcp_mem = 786432 4194304 8388608\
