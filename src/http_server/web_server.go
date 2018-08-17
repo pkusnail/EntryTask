@@ -49,18 +49,18 @@ var (
 )
 
 
-
 func tcpClient(input string) string {
 	log.Println("tcp input: ", input)
 	tcpConn, err := net.Dial("tcp", tcp_server_addr)
 	if err != nil{
 		log.Println(err)
 	}
-	fmt.Fprintf(tcpConn, input + "\n")
-    //message, _ := bufio.NewReader(client.(net.Conn)).ReadString('\n')
-    message, _ := bufio.NewReader(tcpConn).ReadString('\n')
-	log.Println("tcp resp : " , message)
-	return message
+	b, _ := util.Encode(input)
+	tcpConn.Write(b)
+	reader := bufio.NewReader(tcpConn)
+	msg, err := util.Decode(reader)
+	log.Println("tcp resp : " , msg)
+	return msg
 }
 
 func  getMillSec() int64{ // return timestamp
