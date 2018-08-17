@@ -15,6 +15,7 @@ import (
 	"util"
 	"time"
 	"runtime"
+	"bufio"
 	"encoding/json"
 	"github.com/garyburd/redigo/redis"
 )
@@ -327,30 +328,29 @@ func init(){
 
 
 // Handles incoming requests.
-//func tcpRequestHandler(conn net.Conn) {
 func tcpRequestHandler() {
 	for conn := range cq {
-		// Make a buffer to hold incoming data.
-		buf := make([]byte, 4096)
-		// Read the incoming connection into the buffer.
-		reqLen, err := conn.Read(buf)
-		_ = reqLen
-		if err != nil {
-			fmt.Println("Error reading:", err.Error())
+		ipStr := conn.RemoteAddr().String()
+		defer func() {
+			fmt.Println("disconnected :" + ipStr)
 			conn.Close()
+		}()
+		reader := bufio.NewReader(conn)
+		msg, err := util.Decode(reader)
+
+		if err != nil {
+			fmt.Println("Error reading:", err)
+			//conn.Close()
 			return
 		}
-		input := string(buf[:])
-		input = strings.Replace(input,"\x00","",-1)
-		log.Println("input: ", input)
+		log.Println(conn.RemoteAddr().String() + ":" + string(msg))
 		reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
 		var paras []string
-		err = json.Unmarshal([]byte(input), &paras)
+		err = json.Unmarshal([]byte(msg), &paras)
 		if err != nil {
 			log.Println(err)
 			conn.Write([]byte(reply))
-			// Close the connection when you're done with it.
-			conn.Close()
+			//conn.Close()
 		}
 
 		switch paras[0] {
@@ -366,10 +366,10 @@ func tcpRequestHandler() {
 				reply = login(paras[1], paras[2]) +"\n"
 		}
 		log.Println("server resp :", reply)
-		conn.Write([]byte(reply))
-		conn.Close()
+		resp,err:=util.Encode(reply)
+		conn.Write(resp)
+		//conn.Close()
 	}
-	//conn.Close()
 }
 
 func main() {
