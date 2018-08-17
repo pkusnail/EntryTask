@@ -31,8 +31,6 @@ var tcp_server_addr = "loalhost:9999" //default
 
 var client interface{} //*rpc.Client  or tcp client
 
-//var tcpConn net.Conn
-
 type Register struct{ 
 	realname string
 	nickname string
