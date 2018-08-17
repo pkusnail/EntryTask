@@ -58,7 +58,7 @@ func tcpClient(input string) string {
 	b, _ := util.Encode(input)
 	tcpConn.Write(b)
 	reader := bufio.NewReader(tcpConn)
-	msg, err := util.Decode(reader)
+	msg, _ := util.Decode(reader)
 	log.Println("tcp resp : " , msg)
 	return msg
 }
@@ -456,6 +456,10 @@ func init(){
 		if err != nil{
 			log.Println(err)
 		}
+		defer func() {
+			log.Println("closing tcp connect")
+			tcpConn.Close()
+		}()
 	}
 	*/
 	if commType == "rpc" {
