@@ -3,6 +3,8 @@ package util
 import (
     "bufio"
     "bytes"
+	"log"
+	"errors"
     "encoding/binary"
 )
 //for tcp msg processing
@@ -10,6 +12,10 @@ import (
 func Encode(message string) ([]byte, error) {
     //read message length
     var length int32 = int32(len(message))
+    if length > 10240 {
+		log.Println("Warning : parameters too long")
+		return nil, errors.New("Warning : parameters too long")
+	}
     var pkg *bytes.Buffer = new(bytes.Buffer)
     //write header
     err := binary.Write(pkg, binary.LittleEndian, length)
@@ -30,7 +36,11 @@ func Decode(reader *bufio.Reader) (string, error) {
     lengthBuff := bytes.NewBuffer(lengthByte)
     var length int32
     err := binary.Read(lengthBuff, binary.LittleEndian, &length)
-    if err != nil {
+    if length > 10240 {
+		log.Println("Warning : parameters too long")
+		return "", errors.New("Warning : parameters too long")
+	}
+	if err != nil {
        return "", err
     }
     if int32(reader.Buffered()) < length + 4 {
