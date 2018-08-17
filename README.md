@@ -19,7 +19,7 @@ http://alejandroseaah.com:9090/logout
 > sh install.sh\
 > sh run.sh
 
-#Performance Tuning
+# Performance Tuning
 ## TCP Server Side
 
 modify /etc/sysctl.conf as below :
@@ -36,11 +36,11 @@ modify /etc/sysctl.conf as below :
 > net.ipv4.tcp_keepalive_time = 900\
 > net.ipv4.tcp_keepalive_probes = 3\
 > net.ipv4.tcp_fin_timeout = 15  \
-> net.ipv4.tcp_max_orphans = 131072\  
+> net.ipv4.tcp_max_orphans = 131072\
 > net.core.optmem_max = 819200\
-> net.core.rmem_default = 262144\  
+> net.core.rmem_default = 262144\
 > net.core.wmem_default = 262144\ 
-> net.core.rmem_max = 16777216  \
+> net.core.rmem_max = 16777216\
 > net.core.wmem_max = 16777216\
 > net.ipv4.tcp_mem = 786432 4194304 8388608\
 > net.ipv4.tcp_rmem = 4096 4096 4206592\
