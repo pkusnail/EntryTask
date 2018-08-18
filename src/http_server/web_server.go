@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"bytes"
 	"io"
-//	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -171,34 +170,34 @@ func newfileUploadRequest(uri string, params map[string]string, paramName, path 
 }
 
 func upload_help ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
-		startTime := time.Now()
-		extraParams := map[string]string{
-                "title":       "pic title",
-                "author":      "author name",
-                "description": "Golang",
-        }
-        //request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
-        request, err := newfileUploadRequest(conf["image_upload_url"].(string), extraParams, "file", photoRelativePath)
-        if err != nil {
-            log.Println(err)
-			return "NULL"
-        }
-        client := &http.Client{}
-        resp, err := client.Do(request)
-        if err != nil {
-            log.Println(err)
-			return "NULL"
-        } else {
-			body := &bytes.Buffer{}
-			_, err := body.ReadFrom(resp.Body)
-			if err != nil {
-				log.Println(err)
-			}
-			resp.Body.Close()
-			strs := strings.Split(body.String() ,"http://yourhostname:4869/")
-			strs1 := strings.Split(strs[1],"</a>")
-			log.Println("upload_help consumed：", time.Now().Sub(startTime))
-			return strs1[0]  //photoID
+	startTime := time.Now()
+	extraParams := map[string]string{
+			"title":       "pic title",
+			"author":      "author name",
+			"description": "Golang",
+	}
+	//request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
+	request, err := newfileUploadRequest(conf["image_upload_url"].(string), extraParams, "file", photoRelativePath)
+	if err != nil {
+		log.Println(err)
+		return "NULL"
+	}
+	client := &http.Client{}
+	resp, err := client.Do(request)
+	if err != nil {
+		log.Println(err)
+		return "NULL"
+	} else {
+		body := &bytes.Buffer{}
+		_, err := body.ReadFrom(resp.Body)
+		if err != nil {
+			log.Println(err)
+		}
+		resp.Body.Close()
+		strs := strings.Split(body.String() ,"http://yourhostname:4869/")
+		strs1 := strings.Split(strs[1],"</a>")
+		log.Println("upload_help consumed：", time.Now().Sub(startTime))
+		return strs1[0]  //photoID
     }
 }
 
