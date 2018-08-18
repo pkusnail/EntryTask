@@ -99,6 +99,10 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		realname := strings.Join(r.Form["rname"],"")
 		nickname := strings.Join(r.Form["nname"],"")
 		pwd := strings.Join(r.Form["pwd"],"")
+		if len(realname) > 50 || len(nickname) > 50 || len(pwd) > 50{
+			log.Println("input too long, try again")
+			http.Redirect(w, r, "/signup", 302)
+		}
 		//communicate with tcp server and proxy server  
 		reply := ""
 
@@ -316,7 +320,10 @@ func editHandler(w http.ResponseWriter, r *http.Request) {
 		r.ParseForm()
 		var reply string
 		nickname := strings.Join(r.Form["nname"],"")
-		log.Println("nn " + nickname)
+		if len(nickname) > 50  {
+			log.Println("nickname too long, try again")
+			http.Redirect(w, r, "/edit", 302)
+		}
 		if len(nickname) > 0 {
 			if commType == "rpc" {
 				args := util.Args2{ uuid, nickname}
@@ -389,7 +396,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		// logic part of log in
 		username := strings.Join(r.Form["username"],"")
 		pwd := strings.Join(r.Form["password"],"")
-
+		if len(username) > 50 || len(pwd) > 50 {
+			log.Println("input too long, try again")
+			http.Redirect(w, r, "/login", 302)
+		}
 		var reply string
 		if commType == "rpc" {
 			args := util.Args2{username,pwd}

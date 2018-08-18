@@ -5,10 +5,11 @@ curr=`pwd`
 exe=$curr/$path/
 cd $exe
 
-#cd $GOPATH/src
-#git clone git://github.com/alphazero/Go-Redis.git redis
-#cd redis
-#go install
+cd $GOPATH/src
+git clone git://github.com/alphazero/Go-Redis.git redis
+cd redis
+go install
+cd ..
 
 go get -u github.com/go-redis/redis
 go get github.com/go-sql-driver/mysql
@@ -19,7 +20,7 @@ go get github.com/gorilla/sessions
 go get github.com/google/uuid
 go get github.com/garyburd/redigo/redis
 
-#build 
+#build
 cd ../pkg
 go build ../src/tcp_server/tcp_server.go
 mv tcp_server tcp/
