@@ -14,10 +14,29 @@ http://alejandroseaah.com:9090/edit
 
 http://alejandroseaah.com:9090/logout
 
-# How to run
+# How to install
+
 > cd bin\
-> sh install.sh\
-> sh run.sh
+> sh install.sh 
+
+# How to use
+to start servers :
+
+> cd bin\
+> sh run.sh start web  // start web server\
+> sh run.sh start tcp  // start tcp server\
+> sh run.sh start all  // start web and tcp server
+
+to stop servers :
+
+> cd bin\
+> sh run.sh stop web  // stop web server\
+> sh run.sh stop tcp  // stop tcp server\
+> sh run.sh stop all  // stop web and tcp server
+
+to check status :
+
+> sh run.sh status
 
 # Performance Tuning
 ## TCP Server Side
