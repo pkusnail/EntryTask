@@ -1,5 +1,9 @@
 * docker image cmd  should bind 9090 and 4869 ports , like :
+
 > docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869 -it et_v3.7 /bin/bash
+> cd /root/EntryTask/bin 
+> sh run.sh start all
+
 
 * update : this little project is deployed , just visit
 
