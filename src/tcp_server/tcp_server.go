@@ -95,39 +95,17 @@ func (my *mysqlCli) Close(){
 	}
 }
 
-
-func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
+//func (my *mysqlCli) Inquery(sql string, paras  ... string ) bool{
+func (my *mysqlCli) Inquery(sql string, paras  ...interface{} ) bool{
 	my.Connect()
 	stmt, err := my.db.Prepare(sql)
-	if len(paras) == 1 {
-		_, err =stmt.Exec(paras[0])
-	}else if len(paras) == 2 {
-		_, err =stmt.Exec(paras[0], paras[1])
-	}else if len(paras) == 3 {
-		_, err =stmt.Exec(paras[0],paras[1] , paras[2])
-	}else if len(paras) == 4 {
-		_, err =stmt.Exec(paras[0],paras[1] , paras[2], paras[3])
-	}
-
+	_, err =stmt.Exec(paras...)
 	if err == nil{
 		return true
 	}else{
 		return false
 	}
 }
-
-/*
-func (my *mysqlCli) Inquery(sql string, paras  ... string ) bool{
-	my.Connect()
-	stmt, err := my.db.Prepare(sql)
-	_, err =stmt.Exec(paras)
-	if err == nil{
-		return true
-	}else{
-		return false
-	}
-}
-*/
 
 
 var REDIS_MAX_CONN = 20
