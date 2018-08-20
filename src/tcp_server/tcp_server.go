@@ -123,7 +123,7 @@ func putRedis(conn redis.Conn) {
     redisPoll <- conn
 }
 
-func initRedis(network, address string) redis.Conn {
+func initRedis(network, address string)  {
     if len(redisPoll) == 0 {
         redisPoll = make(chan redis.Conn, redisMaxConn)
         go func() {
@@ -136,21 +136,22 @@ func initRedis(network, address string) redis.Conn {
             }
         } ()
     }
-    return <-redisPoll
 }
 
 func redisSet(key string, val string)  {
     startTime := time.Now()
-    c := initRedis("tcp", redisAddr)
+	c := <- redisPoll
 	c.Do("SET", key, val)
     log.Println("redisSet consumed：", time.Now().Sub(startTime))
+	redisPoll <- c
 }
 
 func redisGet(key string) string  {
     startTime := time.Now()
-    c := initRedis("tcp", redisAddr)
+	c := <- redisPoll
 	val, _ := redis.String(c.Do("GET", key))
 	log.Println("redisGet consumed: ", time.Now().Sub(startTime))
+	redisPoll <- c
 	return val
 }
 
@@ -428,6 +429,8 @@ func init(){
 	redisPort := conf["redis_port"].(string)
 	redisAddr = redisHost + ":" + redisPort
 	log.Println("redis addr : " + redisAddr)
+	initRedis("tcp", redisAddr)
+
 	commType = conf["proto"].(string)
 	log.Println("communication type  : " + commType)
 	tcpMaxConn, err = strconv.Atoi(conf["tcp_max_conn"].(string))
