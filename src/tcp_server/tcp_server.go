@@ -95,6 +95,7 @@ func (my *mysqlCli) Close(){
 	}
 }
 
+
 func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
 	my.Connect()
 	stmt, err := my.db.Prepare(sql)
@@ -114,6 +115,19 @@ func (my *mysqlCli) Inquery(sql string, paras ... string ) bool{
 		return false
 	}
 }
+
+/*
+func (my *mysqlCli) Inquery(sql string, paras  ... string ) bool{
+	my.Connect()
+	stmt, err := my.db.Prepare(sql)
+	_, err =stmt.Exec(paras)
+	if err == nil{
+		return true
+	}else{
+		return false
+	}
+}
+*/
 
 
 var REDIS_MAX_CONN = 20
@@ -174,6 +188,21 @@ func hash(s string) string {
 	h := fnv.New64a()
 	h.Write([]byte(s))
 	return strconv.FormatUint(h.Sum64(), 10)
+}
+
+
+func insertAvatar( uuid string, pid string) string {
+	startTime := time.Now()
+	log.Println("avatar paras",uuid,pid)
+	//sql := "insert into  avatar (uuid,pid)  values (?,?)"
+	affect := mCli.Inquery("insert avatar set uuid=?, pid= ?", string(uuid), string(pid))
+	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
+	if affect  {
+		redisSet("uuid_pid:"+uuid,pid)
+		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
+	} else {
+		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
+	}
 }
 
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
@@ -262,12 +291,12 @@ func updateNickname( uuid string, nickname string) string {
 	log.Println("updateNickname consumed：", time.Now().Sub(startTime))
 	return "{\"code\":0,\"msg\":\"\"}";
 }
-
+/*
 func insertAvatar( uuid string, pid string) string {
 	startTime := time.Now()
 	log.Println("avatar paras",uuid,pid)
 	sql := "insert into  avatar (uuid,pid)  values (?,?)"
-	affect := mCli.Inquery(sql, uuid, pid)
+	affect := mCli.Inquery(sql, string(uuid), string(pid))
 	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
 	if affect  {
 		redisSet("uuid_pid:"+uuid,pid)
@@ -276,7 +305,7 @@ func insertAvatar( uuid string, pid string) string {
 		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
 	}
 }
-
+*/
 func updateAvatar( uuid string, pid string) string {
 	startTime := time.Now()
 	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
