@@ -63,18 +63,30 @@ elif [ $# -eq 1 ]; then
     fi
 elif [ $# -eq 2 ]; then
     if [ $1 = "start" ];then
-        killFunc tcp_server
-        killFunc web_server
-
         path=`dirname $0`
         curr=`pwd`
         exe=$curr/$path/../pkg
 
         if [ $2 = "tcp" ];then
+            killFunc tcp_server
             startFunc tcp tcp_server
         elif [ $2 = "web" ];then
+            killFunc web_server
             startFunc web web_server
         elif [ $2 = "all" ];then
+	    killFunc tcp_server
+	    killFunc web_server
+            killFunc mysqld
+            killFunc zimg
+            killFunc redis
+	    chown -R mysql:mysql /var/lib/mysql /var/run/mysqld 
+	    nohup /usr/bin/mysqld_safe  &
+            nohup /root/redis/src/redis-server  /root/redis/redis.conf --loglevel debug &
+
+	    cd /root/zimg
+	    ./zimg conf/zimg.lua
+	    cd $exe
+
             startFunc tcp tcp_server
             startFunc web web_server
         fi
@@ -90,6 +102,7 @@ elif [ $# -eq 2 ]; then
         elif [ $2 = "all" ];then
             killFunc tcp_server
             killFunc web_server
+            killFunc zimg
         fi
         sleep 1
         statusFunc
