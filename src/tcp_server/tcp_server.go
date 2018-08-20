@@ -139,44 +139,6 @@ func updateAvatar( uuid string, pid string) string {
 	}
 }
 
-
-type query string
-
-func (t *query) SignUp( args *util.Args4, reply *string) error{
-	*reply = insertUser(args.A, args.B, args.C, args.D)
-	return nil
-}
-
-func (t *query) SignIn( args *util.Args2, reply *string) error{
-	*reply = login(args.A, args.B)
-	return nil
-}
-
-func (t *query) Lookup( args *util.Args2, reply *string) error{
-	*reply = lookup(args.A)
-	return nil
-}
-
-func (t *query) LookupAvatar( args *util.Args2, reply *string) error{
-	*reply = lookupAvatar(args.A)
-	return nil
-}
-
-func (t *query) InitAvatar( args *util.Args2, reply *string) error{
-	*reply = insertAvatar(args.A, args.B)
-	return nil
-}
-
-func (t *query) ChangeAvatar( args *util.Args2, reply *string) error{
-	*reply = updateAvatar(args.A, args.B)
-	return nil
-}
-
-func (t *query) ChangeNickname( args *util.Args2, reply *string) error{
-	*reply = updateNickname(args.A, args.B)
-	return nil
-}
-
 func businessLogics(paras []string) string {
 	if paras == nil || len(paras) == 0 {
 		log.Println("Parameter error : nil or empty")
@@ -259,6 +221,44 @@ func tcpRequestHandler(conn net.Conn) {
 		mFlow.Release()
 		return
 	}
+}
+
+
+type query string
+
+func (t *query) SignUp( args *util.Args4, reply *string) error{
+	*reply = insertUser(args.A, args.B, args.C, args.D)
+	return nil
+}
+
+func (t *query) SignIn( args *util.Args2, reply *string) error{
+	*reply = login(args.A, args.B)
+	return nil
+}
+
+func (t *query) Lookup( args *util.Args2, reply *string) error{
+	*reply = lookup(args.A)
+	return nil
+}
+
+func (t *query) LookupAvatar( args *util.Args2, reply *string) error{
+	*reply = lookupAvatar(args.A)
+	return nil
+}
+
+func (t *query) InitAvatar( args *util.Args2, reply *string) error{
+	*reply = insertAvatar(args.A, args.B)
+	return nil
+}
+
+func (t *query) ChangeAvatar( args *util.Args2, reply *string) error{
+	*reply = updateAvatar(args.A, args.B)
+	return nil
+}
+
+func (t *query) ChangeNickname( args *util.Args2, reply *string) error{
+	*reply = updateNickname(args.A, args.B)
+	return nil
 }
 
 
