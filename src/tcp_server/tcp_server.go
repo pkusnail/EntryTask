@@ -269,21 +269,7 @@ func updateNickname( uuid string, nickname string) string {
 	log.Println("updateNickname consumed：", time.Now().Sub(startTime))
 	return "{\"code\":0,\"msg\":\"\"}";
 }
-/*
-func insertAvatar( uuid string, pid string) string {
-	startTime := time.Now()
-	log.Println("avatar paras",uuid,pid)
-	sql := "insert into  avatar (uuid,pid)  values (?,?)"
-	affect := mCli.Inquery(sql, string(uuid), string(pid))
-	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
-	if affect  {
-		redisSet("uuid_pid:"+uuid,pid)
-		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
-	} else {
-		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
-	}
-}
-*/
+
 func updateAvatar( uuid string, pid string) string {
 	startTime := time.Now()
 	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
