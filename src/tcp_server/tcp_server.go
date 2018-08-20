@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"os"
 	"log"
-	"fmt"
 	"os/exec"
 	"hash/fnv"
 	"strconv"
@@ -16,6 +15,7 @@ import (
 	"time"
 	"runtime"
 	"bufio"
+	"sync"
 	"encoding/json"
 	"github.com/garyburd/redigo/redis"
 )
@@ -30,6 +30,40 @@ var globalLogFile *os.File
 
 var TCP_MAX_CONN = 10000
 
+
+type flow struct{
+	mutex *sync.Mutex
+	total *int
+}
+
+func ( f *flow ) acquire() bool {
+	if f.mutex == nil{
+		f.mutex = &sync.Mutex{}
+		num := 0
+		f.total = &num
+	}
+
+	if *f.total > TCP_MAX_CONN {
+		return false
+	}
+
+	f.mutex.Lock()
+	*f.total += 1
+	f.mutex.Unlock()
+	log.Println("conn number : ", *f.total)
+	return true;
+}
+
+func ( f *flow ) release() {
+	f.mutex.Lock()
+	*f.total -= 1
+	f.mutex.Unlock()
+	log.Println("conn number : ", *f.total)
+}
+
+var mFlow *flow
+
+
 var cq = make(chan net.Conn, TCP_MAX_CONN) // http client conn queue, default 10000
 
 type mysqlCli struct{
@@ -38,7 +72,7 @@ type mysqlCli struct{
 
 var mCli *mysqlCli
 
-func (my *mysqlCli ) Connect() {
+func (my *mysqlCli ) Connect() bool {
 	if  my.db == nil{
 		var err error
 		dbDriver := "mysql"
@@ -49,8 +83,10 @@ func (my *mysqlCli ) Connect() {
 		my.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
 		if err != nil {
 			log.Println(err.Error())
+			return false
 		}
 	}
+	return true
 }
 
 func (my *mysqlCli) Close(){
@@ -334,35 +370,44 @@ func businessLogics(paras []string) string {
 
 
 // Handles incoming requests.
-func tcpRequestHandler() {
-	for conn := range cq {
-		ipStr := conn.RemoteAddr().String()
-		defer func() {
-			fmt.Println("disconnected :" + ipStr)
-			conn.Close()
-		}()
-		reader := bufio.NewReader(conn)
-		msg, err := util.Decode(reader)
+func tcpRequestHandler(conn net.Conn) {
+	conn.SetDeadline(time.Now().Add( 5 * time.Second))
+	ipStr := conn.RemoteAddr().String()
+	log.Println("connected :" + ipStr)
+	defer func() {
+		log.Println("disconnected :" + ipStr)
+		conn.Close()
+		mFlow.release()
+	}()
+	reader := bufio.NewReader(conn)
+	msg, err := util.Decode(reader)
+	if err != nil {
+		log.Println("Error reading:", err)
+		conn.Close()
+		mFlow.release()
+		return
+	}
 
-		if err != nil {
-			fmt.Println("Error reading:", err)
-			//conn.Close()
-			return
-		}
-		log.Println(conn.RemoteAddr().String() + ":" + string(msg))
-		reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
-		var paras []string
-		err = json.Unmarshal([]byte(msg), &paras)
-		if err != nil {
-			log.Println(err)
-			conn.Write([]byte(reply))
-			//conn.Close()
-		}
-		reply = businessLogics(paras)
-		log.Println("server resp :", reply)
-		resp,err:=util.Encode(reply)
-		conn.Write(resp)
-		//conn.Close()
+	log.Println(conn.RemoteAddr().String() + ":" + string(msg))
+	reply := "{\"code\":1,\"msg\":\"para error\",\"uuid\":\"\"}"
+	var paras []string
+	err = json.Unmarshal([]byte(msg), &paras)
+	if err != nil {
+		log.Println(err)
+		conn.Write([]byte(reply))
+		conn.Close()
+		mFlow.release()
+		return
+	}
+	reply = businessLogics(paras)
+	log.Println("server resp :", reply)
+	resp,err:=util.Encode(reply)
+	_,err = conn.Write(resp)
+	if err != nil {
+		log.Println(err)
+		conn.Close()
+		mFlow.release()
+		return
 	}
 }
 
@@ -393,9 +438,8 @@ func init(){
 	commType = conf["proto"].(string)
 	log.Println("communication type  : " + commType)
 	TCP_MAX_CONN, err = strconv.Atoi(conf["tcp_max_conn"].(string))
-	cq = make(chan net.Conn, TCP_MAX_CONN)
 	log.Println("max tcp conn number  : " , TCP_MAX_CONN)
-
+	mFlow = &flow{mutex:nil}
 }
 
 func main() {
@@ -435,21 +479,21 @@ func main() {
 			log.Println("Error listening:", err.Error())
 			os.Exit(1)
 		}
+
 		defer l.Close()
 		log.Println("listening on ", tcp_port)
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				log.Println("Error accepting: ", err.Error())
-				os.Exit(1)
+				continue
 			}
-			if len(cq) < TCP_MAX_CONN {
-				cq <- conn
+			if mFlow.acquire() {
+				go tcpRequestHandler(conn)
 			}else{
-				log.Println("Warning : tcp connection queue full !")
-				//should do something
+				//downgrade service ,should do something
+				log.Println("Warning : tcp conn too many !")
 			}
-			go tcpRequestHandler()
 		}
 	}
 }

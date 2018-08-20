@@ -63,6 +63,8 @@ elif [ $# -eq 1 ]; then
     fi
 elif [ $# -eq 2 ]; then
     if [ $1 = "start" ];then
+        killFunc tcp_server
+        killFunc web_server
 
         path=`dirname $0`
         curr=`pwd`
@@ -76,6 +78,8 @@ elif [ $# -eq 2 ]; then
             startFunc tcp tcp_server
             startFunc web web_server
         fi
+        sleep 1
+        statusFunc
     fi
 
     if [ $1 = "stop" ];then
@@ -86,7 +90,9 @@ elif [ $# -eq 2 ]; then
         elif [ $2 = "all" ];then
             killFunc tcp_server
             killFunc web_server
-        fi 
+        fi
+        sleep 1
+        statusFunc
     fi
 elif [ $# -gt 2 ];then
     echo "parameter error"
