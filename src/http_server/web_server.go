@@ -26,18 +26,19 @@ var commType = "tcp" // default tcp , can be rpc
 
 var conf = make(map[string]interface{})
 
-var tcp_server_addr = "loalhost:9999" //default
+var tcpServerAddr = "loalhost:9999" //default
 
 var client interface{} //*rpc.Client  or tcp client
 
-type Register struct{ 
+//Registration info structure
+type register struct{ 
 	realname string
 	nickname string
 	info string
 }
-
-type HomeInfo struct {
-	AvatarUrl string
+//Home page info structure
+type homeInfo struct {
+	AvatarURL string
 	Nickname string
 }
 
@@ -50,7 +51,7 @@ var (
 
 func tcpClient(input string) string {
 	log.Println("tcp input: ", input)
-	tcpConn, err := net.Dial("tcp", tcp_server_addr)
+	tcpConn, err := net.Dial("tcp", tcpServerAddr)
 	if err != nil{
 		log.Println(err)
 	}
@@ -86,7 +87,7 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		rn := strings.Join(rname,"")
 		nn := strings.Join(nname,"")
 		_ = ok
-		data := Register {
+		data := register {
 			realname : rn,
 			nickname : nn,
 			info : popup,
@@ -173,7 +174,7 @@ func newfileUploadRequest(uri string, params map[string]string, paramName, path 
         return req, err
 }
 
-func upload_help ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
+func uploadHelp ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
 	startTime := time.Now()
 	extraParams := map[string]string{
 			"title":       "pic title",
@@ -200,7 +201,7 @@ func upload_help ( photoRelativePath string)  string {// upload a local file to 
 		resp.Body.Close()
 		strs := strings.Split(body.String() ,"http://yourhostname:4869/")
 		strs1 := strings.Split(strs[1],"</a>")
-		log.Println("upload_help consumed：", time.Now().Sub(startTime))
+		log.Println("uploadHelp consumed：", time.Now().Sub(startTime))
 		return strs1[0]  //photoID
     }
 }
@@ -257,7 +258,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		defer f.Close()
 		io.Copy(f, file)
 		localFile := conf["tmp_file_dir"].(string) + "/" + uploadedFileName
-		photoID := upload_help(localFile)
+		photoID := uploadHelp(localFile)
 
 		// delete file
 		if photoID != "NULL" {
@@ -365,11 +366,11 @@ func homeHandler(w http.ResponseWriter, r *http.Request) {
 	code := dat["code"].(float64)
 	pid := dat["photoid"].(string)
 	nickname := dat["nickname"].(string)
-	//avatar_url := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
-	avatar_url := conf["image_fetch_prefix"].(string) + "/"+ pid +"?w=600&h=600"
+	//avatarURL := "http://alejandroseaah.com:4869/"+ pid +"?w=600&h=600"
+	avatarURL := conf["image_fetch_prefix"].(string) + "/"+ pid +"?w=600&h=600"
 	_ = code
-	data := HomeInfo{
-		AvatarUrl :  avatar_url,
+	data := homeInfo{
+		AvatarURL :  avatarURL,
 		Nickname : nickname,
 	}
 
@@ -456,11 +457,11 @@ func init(){
 	commType = conf["proto"].(string)
 	log.Println("proto type : " , commType)
 
-	tcp_server_addr = conf["tcp_server_host"].(string) + ":" + conf["tcp_server_port"].(string)
-	log.Println("tcp server addr : " , tcp_server_addr)
+	tcpServerAddr = conf["tcp_server_host"].(string) + ":" + conf["tcp_server_port"].(string)
+	log.Println("tcp server addr : " , tcpServerAddr)
 	/*
 	if commType == "tcp" {
-		tcpConn, err = net.Dial("tcp", tcp_server_addr)
+		tcpConn, err = net.Dial("tcp", tcpServerAddr)
 		if err != nil{
 			log.Println(err)
 		}
@@ -471,7 +472,7 @@ func init(){
 	}
 	*/
 	if commType == "rpc" {
-		client, err = rpc.Dial("tcp", tcp_server_addr)
+		client, err = rpc.Dial("tcp", tcpServerAddr)
 		if err != nil{
 			log.Println(err)
 		}
@@ -509,8 +510,8 @@ func main() {
 	http.HandleFunc("/edit", editHandler)
 
 	//web_host := conf["web_server_host"].(string)
-	web_port := conf["web_server_port"].(string)
-	addr := ":"+web_port
+	webPort := conf["web_server_port"].(string)
+	addr := ":"+webPort
 	log.Println("listening to addr  " +  addr)
 	err = http.ListenAndServe(string(addr), nil) // setting listening port
 	if err != nil {
