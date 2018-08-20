@@ -432,7 +432,7 @@ func init(){
 	log.Println("communication type  : " + commType)
 	TCP_MAX_CONN, err = strconv.Atoi(conf["tcp_max_conn"].(string))
 	log.Println("max tcp conn number  : " , TCP_MAX_CONN)
-	mFlow = &flow{mutex:nil}
+	mFlow = &flow{mutex:nil,total:nil}
 }
 
 func main() {
