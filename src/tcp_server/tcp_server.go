@@ -2,11 +2,8 @@ package main
 
 import (
 	_ "github.com/go-sql-driver/mysql"
-	"database/sql"
 	"os"
 	"log"
-	"os/exec"
-	"hash/fnv"
 	"strconv"
 	"strings"
 	"net"
@@ -17,7 +14,6 @@ import (
 	"bufio"
 	"sync"
 	"encoding/json"
-	"github.com/garyburd/redigo/redis"
 )
 
 var commType = "tcp" //default tcp, can be rpc
@@ -28,147 +24,11 @@ var logDir string
 
 var globalLogFile *os.File
 
-var tcpMaxConn = 10000
+var mFlow *util.Flow
 
+var mCli *util.MysqlCli
 
-type flow struct{
-	mutex *sync.Mutex
-	total *int
-}
-
-func ( f *flow ) acquire() bool {
-	if f.mutex == nil{
-		f.mutex = &sync.Mutex{}
-		num := 0
-		f.total = &num
-	}
-
-	if *f.total > tcpMaxConn {
-		return false
-	}
-
-	f.mutex.Lock()
-	*f.total ++
-	f.mutex.Unlock()
-	log.Println("conn number : ", *f.total)
-	return true;
-}
-
-func ( f *flow ) release() {
-	f.mutex.Lock()
-	*f.total --
-	f.mutex.Unlock()
-	log.Println("conn number : ", *f.total)
-}
-
-var mFlow *flow
-
-
-var cq = make(chan net.Conn, tcpMaxConn) // http client conn queue, default 10000
-
-type mysqlCli struct{
-	db *sql.DB
-}
-
-var mCli *mysqlCli
-
-func (my *mysqlCli ) Connect() bool {
-	if  my.db == nil{
-		var err error
-		dbDriver := "mysql"
-		dbUser := conf["db_user"].(string)
-		dbPass := conf["db_pass"].(string)
-		dbName := conf["db_name"].(string)
-		dbAddr := conf["mysql_host"].(string) + ":" + conf["mysql_port"].(string) 
-		my.db, err = sql.Open(dbDriver, dbUser+":"+dbPass+"@tcp(" + dbAddr +")/"+dbName)
-		if err != nil {
-			log.Println(err.Error())
-			return false
-		}
-	}
-	return true
-}
-
-func (my *mysqlCli) Close(){
-	if my.db != nil {
-		my.db.Close()
-	}
-}
-
-//func (my *mysqlCli) Inquery(sql string, paras  ... string ) bool{
-func (my *mysqlCli) Inquery(sql string, paras  ...interface{} ) bool{
-	my.Connect()
-	stmt, err := my.db.Prepare(sql)
-	_, err =stmt.Exec(paras...)
-	if err == nil{
-		return true
-	}else{
-		return false
-	}
-}
-
-
-var redisMaxConn = 20
-var redisAddr = "127.0.0.1:6379" //default value
-var redisPoll chan redis.Conn
-
-func putRedis(conn redis.Conn) {
-    if redisPoll == nil {
-        redisPoll = make(chan redis.Conn, redisMaxConn)
-    }
-    if len(redisPoll) >= redisMaxConn {
-        conn.Close()
-        return
-    }
-    redisPoll <- conn
-}
-
-func initRedis(network, address string)  {
-    if len(redisPoll) == 0 {
-        redisPoll = make(chan redis.Conn, redisMaxConn)
-        go func() {
-            for i := 0; i < redisMaxConn; i++ {
-                c, err := redis.Dial(network, address)
-                if err != nil {
-                    panic(err)
-                }
-                putRedis(c)
-            }
-        } ()
-    }
-}
-
-func redisSet(key string, val string)  {
-    startTime := time.Now()
-	c := <- redisPoll
-	c.Do("SET", key, val)
-    log.Println("redisSet consumed：", time.Now().Sub(startTime))
-	redisPoll <- c
-}
-
-func redisGet(key string) string  {
-    startTime := time.Now()
-	c := <- redisPoll
-	val, _ := redis.String(c.Do("GET", key))
-	log.Println("redisGet consumed: ", time.Now().Sub(startTime))
-	redisPoll <- c
-	return val
-}
-
-func uuID() string {
-    out, err := exec.Command("uuidgen").Output()
-    if err != nil {
-        log.Fatal(err)
-    }
-    return strings.Replace(string(out), "\n", "", -1)
-}
-
-func hash(s string) string {
-	h := fnv.New64a()
-	h.Write([]byte(s))
-	return strconv.FormatUint(h.Sum64(), 10)
-}
-
+var redisPool *util.RedisPool
 
 func insertAvatar( uuid string, pid string) string {
 	startTime := time.Now()
@@ -177,7 +37,7 @@ func insertAvatar( uuid string, pid string) string {
 	affect := mCli.Inquery("insert avatar set uuid=?, pid= ?", string(uuid), string(pid))
 	log.Println("insertAvatar consumed：", time.Now().Sub(startTime))
 	if affect  {
-		redisSet("uuid_pid:"+uuid,pid)
+		redisPool.RedisSet("uuid_pid:"+uuid,pid)
 		return "{\"code\":0,\"msg\":\"success\",\"data\":\"\"}";
 	} else {
 		return "{\"code\":2,\"msg\":\"failed to insert avatar\"}";
@@ -186,30 +46,29 @@ func insertAvatar( uuid string, pid string) string {
 
 func insertUser( realname string, nickname string, pwd string, avatar string) string {
 	startTime := time.Now()
-	//redis format :  username:realname
-	resp := redisGet( "user:" + realname)
+	resp := redisPool.RedisGet( "user:" + realname)
 	if resp != "" {
 		log.Println(realname +" already exists!")
 		return "{\"code\":1,\"msg\":\"should NOT overwrite existing data\",\"uuid\":\"\"}"
 	}
 
-	uuid := uuID()
-	hashedPwd :=string(hash(pwd))
+	uuid := util.UUID()
+	hashedPwd :=string(util.Hash(pwd))
 	mCli.Inquery("INSERT user SET uuid=?,realname=?,nickname=?,pwd=?",uuid, realname,nickname,hashedPwd)
-	if mCli.db == nil{
+	if mCli.MDB == nil{
 		log.Println("mysql client is nil")
 	}
 
-	redisSet("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
-	redisSet("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
+	redisPool.RedisSet("user:"+realname, uuid + "_"+ hashedPwd + "_" + nickname)
+	redisPool.RedisSet("uuid:"+uuid, uuid + "_"+ hashedPwd + "_" + nickname+ "_" + realname)
 	log.Println("insertUser consumed：", time.Now().Sub(startTime))
 	return login(realname ,pwd)
 }
 
 func login(realname string, pwd string) string {
     startTime := time.Now()
-	hashedPwd :=string(hash(pwd))
-	resp := redisGet("user:"+realname)
+	hashedPwd :=string(util.Hash(pwd))
+	resp := redisPool.RedisGet("user:"+realname)
 	if resp == "" {
 		return "{\"code\":1,\"msg\":\"fail\",\"uuid\":\"\"}"
 	}
@@ -228,12 +87,11 @@ func login(realname string, pwd string) string {
 
 func lookup(uuid string) string {
     startTime := time.Now()
-	// lookup the redis cache first
-	photoID := redisGet("uuid_pid:"+uuid)
+	photoID := redisPool.RedisGet("uuid_pid:"+uuid)
 	if photoID ==""{
 		return "{\"code\":2,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
-	resp := redisGet("uuid:"+uuid)
+	resp := redisPool.RedisGet("uuid:"+uuid)
 	if resp == "" {
 		return "{\"code\":3,\"msg\":\"failed\",\"nickname\":\"\",\"photoid\":\"" + photoID + "\"}"
 	}
@@ -244,29 +102,28 @@ func lookup(uuid string) string {
 
 func lookupAvatar(uuid string) string {
 	startTime := time.Now()
-	resp := redisGet("uuid_pid:" +uuid)
+	resp := redisPool.RedisGet("uuid_pid:" +uuid)
 	log.Println("lookup avatar : " + resp)
 	log.Println("lookupAvatar consumed：", time.Now().Sub(startTime))
-	//return "{code:0,msg :'success',data:'{uuid:" + uuid + "}'}"
 	return "{\"code\":0,\"msg\":\"success\",\"photoid\":\"" + resp + "\"}"
 }
 
 func updateNickname( uuid string, nickname string) string {
 	startTime := time.Now()
 	mCli.Inquery("update user set nickname=? where uuid=?",nickname, uuid)
-	uuidPidNnRn := redisGet("uuid:"+uuid)
+	uuidPidNnRn := redisPool.RedisGet("uuid:"+uuid)
 	log.Println(uuidPidNnRn)
 	upnr := strings.Split(uuidPidNnRn,"_")
-	redisSet("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
+	redisPool.RedisSet("uuid:"+uuid, uuid + "_" + upnr[1] + "_" + nickname+ "_" + upnr[3])
 	log.Println(upnr[0])
 	log.Println(upnr[1])
 	log.Println(upnr[2])
 	log.Println(upnr[3])
 
-	uuidPwdNn := redisGet("uuid:" + upnr[3])
+	uuidPwdNn := redisPool.RedisGet("uuid:" + upnr[3])
 	upn := strings.Split(uuidPwdNn,"_")
 	log.Println("upn: " + uuidPwdNn)
-	_=upn
+	_ = upn
 	log.Println("updateNickname consumed：", time.Now().Sub(startTime))
 	return "{\"code\":0,\"msg\":\"\"}";
 }
@@ -276,12 +133,12 @@ func updateAvatar( uuid string, pid string) string {
 	affect := mCli.Inquery("update avatar set pid=? where uuid=?",pid, uuid)
 	log.Println("updateAvatar consumed：", time.Now().Sub(startTime))
 	if affect {
-		//update redis cache	
 		return "{\"code\":0,\"msg\":\"success\"}";
 	} else {
 		return "{\"code\":1,\"msg\":\"failed to update avatar\"}";
 	}
 }
+
 
 type query string
 
@@ -319,7 +176,6 @@ func (t *query) ChangeNickname( args *util.Args2, reply *string) error{
 	*reply = updateNickname(args.A, args.B)
 	return nil
 }
-
 
 func businessLogics(paras []string) string {
 	if paras == nil || len(paras) == 0 {
@@ -371,14 +227,14 @@ func tcpRequestHandler(conn net.Conn) {
 	defer func() {
 		log.Println("disconnected :" + ipStr)
 		conn.Close()
-		mFlow.release()
+		mFlow.Release()
 	}()
 	reader := bufio.NewReader(conn)
 	msg, err := util.Decode(reader)
 	if err != nil {
 		log.Println("Error reading:", err)
 		conn.Close()
-		mFlow.release()
+		mFlow.Release()
 		return
 	}
 
@@ -390,7 +246,7 @@ func tcpRequestHandler(conn net.Conn) {
 		log.Println(err)
 		conn.Write([]byte(reply))
 		conn.Close()
-		mFlow.release()
+		mFlow.Release()
 		return
 	}
 	reply = businessLogics(paras)
@@ -400,7 +256,7 @@ func tcpRequestHandler(conn net.Conn) {
 	if err != nil {
 		log.Println(err)
 		conn.Close()
-		mFlow.release()
+		mFlow.Release()
 		return
 	}
 }
@@ -419,23 +275,46 @@ func init(){
 	}
 	defer globalLogFile.Close()
 	log.SetOutput(globalLogFile)
-	mCli = &mysqlCli{db:nil}
+	dbUser := conf["db_user"].(string)
+	dbPass := conf["db_pass"].(string)
+	dbName := conf["db_name"].(string)
+	dbAddr := conf["mysql_host"].(string) + ":" + conf["mysql_port"].(string)
 
-	redisMaxConn, err = strconv.Atoi(conf["redis_max_conn"].(string))
-	if err != nil{
-		log.Println(err)
+	mCli = &util.MysqlCli{
+		MDB : nil,
+		DBUser : &dbUser,
+		DBPass : &dbPass,
+		DBName : &dbName,
+		DBAddr : &dbAddr,
 	}
+	mCli.Connect()
+
 	redisHost := conf["redis_host"].(string)
 	redisPort := conf["redis_port"].(string)
-	redisAddr = redisHost + ":" + redisPort
+	redisAddr := redisHost + ":" + redisPort
+	maxIdle, err := strconv.Atoi(conf["redis_max_idle"].(string))
+	maxActive, err := strconv.Atoi(conf["redis_max_active"].(string))
 	log.Println("redis addr : " + redisAddr)
-	initRedis("tcp", redisAddr)
+	//initRedis("tcp", redisAddr)
+	redisPool = &util.RedisPool{
+		MaxIdle : &maxIdle,
+		MaxActive : &maxActive,
+		Addr : &redisAddr,
+		Pool : nil,
+	}
+	redisPool.NewPool()
 
 	commType = conf["proto"].(string)
 	log.Println("communication type  : " + commType)
-	tcpMaxConn, err = strconv.Atoi(conf["tcp_max_conn"].(string))
-	log.Println("max tcp conn number  : " , tcpMaxConn)
-	mFlow = &flow{mutex:nil,total:nil}
+	maxConn, err := strconv.Atoi(conf["tcp_max_conn"].(string))
+	log.Println("max tcp conn number  : " , maxConn)
+	num := 0
+
+	mFlow = &util.Flow{
+		Mutex : &sync.Mutex{},
+		Total : &num,
+		TcpMaxConn : &maxConn,
+	}
 }
 
 func main() {
@@ -451,7 +330,6 @@ func main() {
 	log.SetOutput(globalLogFile)
 
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	//tcp_host := conf["tcp_server_host"].(string)
 	tcpPort := conf["tcp_server_port"].(string)
 
 	if commType == "rpc" {
@@ -459,10 +337,15 @@ func main() {
 		rpc.Register(teller)
 		tcpAddr, err := net.ResolveTCPAddr("tcp", ":" + tcpPort)
 		listener, err := net.ListenTCP("tcp", tcpAddr)
-		_ = err
+		if err != nil {
+			log.Println("Error listening:", err.Error())
+			os.Exit(1)
+		}
+
 		for {
 			conn, err := listener.Accept()
 			if err != nil {
+				log.Println("Error accepting: ", err.Error())
 				continue
 			}
 			rpc.ServeConn(conn)
@@ -484,7 +367,7 @@ func main() {
 				log.Println("Error accepting: ", err.Error())
 				continue
 			}
-			if mFlow.acquire() {
+			if mFlow.Acquire() {
 				go tcpRequestHandler(conn)
 			}else{
 				//downgrade service ,should do something

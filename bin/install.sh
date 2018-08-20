@@ -11,14 +11,15 @@ cd redis
 go install
 cd ..
 
-go get -u github.com/go-redis/redis
+go get github.com/gomodule/redigo/redis
+#go get -u github.com/go-redis/redis
 go get github.com/go-sql-driver/mysql
 go get github.com/tsliwowicz/go-wrk
 go get -u github.com/gorilla/mux
 go get golang.org/x/crypto/bcrypt
 go get github.com/gorilla/sessions
 go get github.com/google/uuid
-go get github.com/garyburd/redigo/redis
+#go get github.com/garyburd/redigo/redis
 
 #build
 cd ../pkg

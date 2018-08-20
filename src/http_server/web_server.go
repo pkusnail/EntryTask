@@ -96,7 +96,6 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		t.Execute(w, data)
 	} else {
 		r.ParseForm()
-		// logic part of signup
 		realname := strings.Join(r.Form["rname"],"")
 		nickname := strings.Join(r.Form["nname"],"")
 		pwd := strings.Join(r.Form["pwd"],"")
@@ -104,7 +103,6 @@ func signup(w http.ResponseWriter, r *http.Request) {
 			log.Println("input too long, try again")
 			http.Redirect(w, r, "/signup", 302)
 		}
-		//communicate with tcp server and proxy server  
 		reply := ""
 
 		if commType == "rpc" {
@@ -132,7 +130,6 @@ func signup(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("uuid:%s\n",  uuid)
 
-		// store session info
 		log.Println("sess start")
 		session, _ := store.Get(r, "cookie-name")
 		session.Values["authenticated"] = true
@@ -177,11 +174,10 @@ func newfileUploadRequest(uri string, params map[string]string, paramName, path 
 func uploadHelp ( photoRelativePath string)  string {// upload a local file to photo server  alejandroseaah.com/upload, and return photo id
 	startTime := time.Now()
 	extraParams := map[string]string{
-			"title":       "pic title",
-			"author":      "author name",
-			"description": "Golang",
+			"title":       "",
+			"author":      "",
+			"description": "",
 	}
-	//request, err := newfileUploadRequest("http://alejandroseaah.com:4869/upload", extraParams, "file", photoRelativePath)
 	request, err := newfileUploadRequest(conf["image_upload_url"].(string), extraParams, "file", photoRelativePath)
 	if err != nil {
 		log.Println(err)
@@ -265,7 +261,6 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 			session.Values["photoid"] = photoID
 			session.Save(r, w)
 			log.Println("saved")
-			//update db	
 			var reply string
 
 			if commType == "rpc" {
@@ -424,7 +419,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w,r,"/login", 302)
 		}
 		log.Println("check login uuid: ",uuid)
-		//communicate with tcp server and proxy server
 		session.Values["authenticated"] = true
 		session.Values["uuid"] = uuid
 		session.Save(r, w)
@@ -432,12 +426,6 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/home", 302)
   }
 }
-
-
-
-
-
-
 
 func init(){
 	dir, err := os.Getwd()
@@ -459,18 +447,6 @@ func init(){
 
 	tcpServerAddr = conf["tcp_server_host"].(string) + ":" + conf["tcp_server_port"].(string)
 	log.Println("tcp server addr : " , tcpServerAddr)
-	/*
-	if commType == "tcp" {
-		tcpConn, err = net.Dial("tcp", tcpServerAddr)
-		if err != nil{
-			log.Println(err)
-		}
-		defer func() {
-			log.Println("closing tcp connect")
-			tcpConn.Close()
-		}()
-	}
-	*/
 	if commType == "rpc" {
 		client, err = rpc.Dial("tcp", tcpServerAddr)
 		if err != nil{
@@ -498,10 +474,6 @@ func main() {
 		defer client.(*rpc.Client).Close()
 	}
 
-	if commType == "tcp" {
-		//defer client.(net.Conn).Close()
-	}
-
 	http.HandleFunc("/signup", signup)
 	http.HandleFunc("/upload", uploadHandler)
 	http.HandleFunc("/login", loginHandler)
@@ -509,11 +481,10 @@ func main() {
 	http.HandleFunc("/home", homeHandler)
 	http.HandleFunc("/edit", editHandler)
 
-	//web_host := conf["web_server_host"].(string)
 	webPort := conf["web_server_port"].(string)
 	addr := ":"+webPort
 	log.Println("listening to addr  " +  addr)
-	err = http.ListenAndServe(string(addr), nil) // setting listening port
+	err = http.ListenAndServe(string(addr), nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
 	}
