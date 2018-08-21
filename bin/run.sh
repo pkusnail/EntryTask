@@ -22,21 +22,30 @@ startFunc()
     nohup ./$2 &
 }
 
-statusFunc()
+grepFunc()
 {
-    strs=`netstat -nap | grep tcp_server | grep LISTEN | awk {' print $7'}`
+    strs=`netstat -nap | grep $1 | grep LISTEN | awk {' print $7'}`
     if [ ${#strs} -eq 0 ]; then
-        echo "tcp server not working"
+        echo "$1 not working"
     else
         echo $strs
     fi
 
-    strs=`netstat -nap | grep web_server | grep LISTEN | awk {' print $7'}`
-    if [ ${#strs} -eq 0 ]; then
-        echo "web server not working"
-    else
-        echo $strs
-    fi
+
+}
+
+statusFunc()
+{
+	grepFunc tcp_server
+	grepFunc web_server
+	grepFunc redis
+	grepFunc zimg
+	mysql=`ps -ef | grep mysqld.pid | grep -v grep  | grep mysql.sock | wc -l`
+	if [ ${mysql} -gt 0 ]; then
+		echo "mysql is working"
+	else
+		echo "mysql is not working"
+	fi
 }
 
 usage()
