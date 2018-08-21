@@ -1,5 +1,6 @@
 #!/bin/sh
 
+source /etc/profile
 path=`dirname $0`
 curr=`pwd`
 exe=$curr/$path/
