@@ -1,13 +1,16 @@
-* When testing, docker container install will automatically start the server when reboot , as described in crontab task:
+* When testing, docker container instance will automatically start the server when reboot , as described in crontab task:
 > @reboot /bin/sh /root/EntryTask/bin/run.sh start all
 
-* When testing, docker container instance should bind on port 9090 and port 4869,
+* When testing, docker container instance should bind on port 9090 (web service) and port 4869 (image service),
 when running deamon mode ,cmd may as below :
 > docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869  --name test -dit et_v3.83 bash
+
 and you can check the service http://localhost:9090/login\
 or check the detail in log path : /root/EntryTask/log/\
 if you want to interactive with the container:
+
 > docker attache test
+
 or just run interactive mode from scratch, cmd may as below :
 
 > docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869 -it et_v3.83 /bin/bash\
