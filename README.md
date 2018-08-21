@@ -5,8 +5,10 @@
 when running deamon mode ,cmd may as below :
 > docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869  --name test -dit et_v3.83 bash
 
-and you can check the service http://localhost:9090/login\
-or check the detail in log path : /root/EntryTask/log/\
+and you can check the service http://localhost:9090/login
+
+or check the detail in log path : /root/EntryTask/log/
+
 if you want to interactive with the container:
 
 > docker attache test
