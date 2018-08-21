@@ -3,9 +3,9 @@
 
 * When testing, docker container instance should bind on port 9090 (web service) and port 4869 (image service),
 when running deamon mode ,cmd may as below :
-> docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869  --name test -dit et_v3.83 bash
+> docker run -p 127.0.0.1:9090:9090  -p 127.0.0.1:4869:4869  --name test -dit et_v3.85 bash
 
-and you can check the service http://localhost:9090/login
+and you can check the service http://localhost:9090/login or http://localhost:9090/signup
 
 or check the detail in log path : /root/EntryTask/log/
 
